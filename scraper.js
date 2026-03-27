@@ -5,7 +5,6 @@ const path = require('path');
 // Configuration
 const ICONSTRUYE_URL = 'https://cl.iconstruye.com';
 const LOGIN_URL = `${ICONSTRUYE_URL}/loginsso.aspx`;
-const CONTROL_RECEPCION_URL = `${ICONSTRUYE_URL}/Recepcion/ControlRecepcion.aspx`;
 const USERNAME = process.env.ICONSTRUYE_USER;
 const PASSWORD = process.env.ICONSTRUYE_PASS;
 
@@ -57,7 +56,6 @@ async function login(page) {
   const currentUrl = page.url();
   console.log('URL despuÃ©s de login:', currentUrl);
   if (currentUrl.includes('loginsso')) {
-    // Still on login page - take screenshot for debugging
     await page.screenshot({ path: path.join(__dirname, 'data', 'login_failed.png') });
     throw new Error('Login fallÃ³ - aÃºn en pÃ¡gina de login');
   }
@@ -65,62 +63,234 @@ async function login(page) {
   console.log('SesiÃ³n iniciada correctamente');
 }
 
-async function navigateToControlRecepcion(page) {
-  console.log('Navegando a Control de Recepciones...');
-  await page.goto(CONTROL_RECEPCION_URL, { waitUntil: 'networkidle', timeout: 60000 });
-  await page.waitForTimeout(5000);
-
-  // Log current URL and frames for debugging
-  console.log('URL actual:', page.url());
+async function exploreFrames(page, label) {
   const frames = page.frames();
-  console.log(`Frames encontrados: ${frames.length}`);
+  console.log(`${label} - Frames encontrados: ${frames.length}`);
   for (let i = 0; i < frames.length; i++) {
     try {
-      console.log(`  Frame ${i}: ${frames[i].url()}`);
+      const url = frames[i].url();
+      console.log(`  Frame ${i}: ${url}`);
+    } catch (e) {
+      console.log(`  Frame ${i}: [inaccesible]`);
+    }
+  }
+  return frames;
+}
+
+async function navigateToControlRecepcion(page) {
+  console.log('=== Explorando pÃ¡gina principal despuÃ©s de login ===');
+
+  // First, explore the main page structure
+  const mainUrl = page.url();
+  console.log('URL principal:', mainUrl);
+
+  let frames = await exploreFrames(page, 'PÃ¡gina principal');
+
+  // Take a screenshot of the main page
+  fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+  await page.screenshot({ path: path.join(__dirname, 'data', 'debug_main_page.png') });
+
+  // iConstruye uses a frameset - the main content is usually in a frame called "mainFrame" or similar
+  // Try to find menu frame and content frame
+  let menuFrame = null;
+  let contentFrame = null;
+
+  for (const frame of frames) {
+    try {
+      const url = frame.url();
+      if (url.includes('menu') || url.includes('Menu') || url.includes('nav') || url.includes('Nav')) {
+        menuFrame = frame;
+        console.log(`  -> Menu frame encontrado: ${url}`);
+      }
+      if (url.includes('content') || url.includes('Content') || url.includes('main') || url.includes('Main')) {
+        contentFrame = frame;
+        console.log(`  -> Content frame encontrado: ${url}`);
+      }
     } catch (e) {}
   }
 
-  let targetFrame = page;
-
-  // Try to find the frame containing the search form or table
+  // Log all links in each frame to find navigation
   for (const frame of frames) {
     try {
-      // Check for common elements in iConstruye Control de Recepcion
+      const url = frame.url();
+      if (url === 'about:blank' || url === '') continue;
+
+      const links = await frame.evaluate(() => {
+        const allLinks = document.querySelectorAll('a');
+        const linkData = [];
+        allLinks.forEach(a => {
+          const href = a.href || '';
+          const text = a.innerText?.trim() || '';
+          const onclick = a.getAttribute('onclick') || '';
+          if ((href.toLowerCase().includes('recepcion') ||
+               text.toLowerCase().includes('recepcion') || text.toLowerCase().includes('recepciÃ³n') ||
+               onclick.toLowerCase().includes('recepcion')) && text.length < 100) {
+            linkData.push({ text, href: href.substring(0, 200), onclick: onclick.substring(0, 200) });
+          }
+        });
+        return linkData;
+      });
+
+      if (links.length > 0) {
+        console.log(`  Links "recepcion" en frame ${url}:`);
+        links.forEach(l => console.log(`    - "${l.text}" -> ${l.href} [onclick: ${l.onclick}]`));
+      }
+    } catch (e) {}
+  }
+
+  // Strategy 1: Try to find and click menu items in any frame
+  console.log('\n=== Estrategia 1: Buscar menÃº de RecepciÃ³n ===');
+
+  for (const frame of frames) {
+    try {
+      // Look for "RecepciÃ³n" or "Control" menu links
+      const recepcionLinks = frame.locator('a:has-text("Recepci"), a:has-text("Control de Recep"), a:has-text("Control Recep")');
+      const count = await recepcionLinks.count();
+
+      if (count > 0) {
+        console.log(`  Encontrados ${count} links de recepciÃ³n en frame ${frame.url()}`);
+        for (let i = 0; i < count; i++) {
+          const text = await recepcionLinks.nth(i).innerText();
+          console.log(`    Link ${i}: "${text.trim()}"`);
+        }
+
+        // Try to click "Control de RecepciÃ³n" first, then "RecepciÃ³n"
+        const controlLink = frame.locator('a:has-text("Control de Recep"), a:has-text("Control Recep")').first();
+        if (await controlLink.count() > 0) {
+          console.log('  Clickeando "Control de RecepciÃ³n"...');
+          await controlLink.click();
+          await page.waitForTimeout(5000);
+
+          // Check if we got to the right page
+          frames = await exploreFrames(page, 'DespuÃ©s de click Control RecepciÃ³n');
+          break;
+        }
+
+        // Otherwise click "RecepciÃ³n" main menu
+        const recepLink = frame.locator('a:has-text("Recepci")').first();
+        if (await recepLink.count() > 0) {
+          console.log('  Clickeando "RecepciÃ³n" menÃº...');
+          await recepLink.click();
+          await page.waitForTimeout(3000);
+
+          // Now look for sub-menu "Control de RecepciÃ³n"
+          frames = await exploreFrames(page, 'DespuÃ©s de click RecepciÃ³n');
+
+          for (const f of page.frames()) {
+            const subLink = f.locator('a:has-text("Control de Recep"), a:has-text("Control Recep")');
+            if (await subLink.count() > 0) {
+              console.log('  Clickeando sub-menÃº "Control de RecepciÃ³n"...');
+              await subLink.first().click();
+              await page.waitForTimeout(5000);
+              frames = await exploreFrames(page, 'DespuÃ©s de click sub-menÃº');
+              break;
+            }
+          }
+          break;
+        }
+      }
+    } catch (e) {
+      console.log(`  Error en frame: ${e.message}`);
+    }
+  }
+
+  // Strategy 2: If direct URL failed before, try navigating within a frame
+  console.log('\n=== Estrategia 2: Buscar frame con formulario ===');
+
+  frames = page.frames();
+  let targetFrame = page;
+
+  for (const frame of frames) {
+    try {
       const hasRutField = await frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').count();
       const hasBtn = await frame.locator('#btnBuscar, [name="btnBuscar"], input[value="Buscar"]').count();
       const hasTable = await frame.locator('#tblDetalle').count();
 
       if (hasRutField > 0 || hasBtn > 0 || hasTable > 0) {
-        console.log(`  -> Frame seleccionado: ${frame.url()} (Rut: ${hasRutField}, Btn: ${hasBtn}, Tabla: ${hasTable})`);
+        console.log(`  -> Frame con formulario: ${frame.url()} (Rut: ${hasRutField}, Btn: ${hasBtn}, Tabla: ${hasTable})`);
         targetFrame = frame;
         break;
       }
-    } catch (e) { /* skip inaccessible frames */ }
+    } catch (e) {}
   }
 
-  // If still on main page, wait more and try again
-  if (targetFrame === page && frames.length > 1) {
-    console.log('Frame no encontrado, esperando mÃ¡s...');
-    await page.waitForTimeout(5000);
+  // Strategy 3: Try navigating to different URL patterns for Control Recepcion
+  if (targetFrame === page) {
+    console.log('\n=== Estrategia 3: Probar URLs alternativas ===');
 
-    const frames2 = page.frames();
-    for (const frame of frames2) {
+    const alternativeUrls = [
+      `${ICONSTRUYE_URL}/Recepcion/ControlRecepcion.aspx`,
+      `${ICONSTRUYE_URL}/recepcion/controlrecepcion.aspx`,
+      `${ICONSTRUYE_URL}/Recepcion/ControlRecepcion`,
+      `${ICONSTRUYE_URL}/Modules/Recepcion/ControlRecepcion.aspx`,
+      `${ICONSTRUYE_URL}/modules/recepcion/controlrecepcion.aspx`,
+      `${ICONSTRUYE_URL}/App/Recepcion/ControlRecepcion.aspx`,
+    ];
+
+    // First, let's explore all frame URLs and log all links to help debug
+    for (const frame of page.frames()) {
       try {
-        const hasRutField = await frame.locator('input[id*="Rut"], input[id*="rut"]').count();
-        const hasAnyInput = await frame.locator('input[type="text"]').count();
-        console.log(`  Frame retry: ${frame.url()} (Rut: ${hasRutField}, inputs: ${hasAnyInput})`);
-        if (hasRutField > 0) {
-          targetFrame = frame;
-          break;
+        const allLinks = await frame.evaluate(() => {
+          const links = document.querySelectorAll('a');
+          const result = [];
+          links.forEach(a => {
+            const href = a.href || '';
+            const text = a.innerText?.trim() || '';
+            if (text.length > 0 && text.length < 80) {
+              result.push({ text, href: href.substring(0, 250) });
+            }
+          });
+          return result.slice(0, 50); // Limit to first 50
+        });
+
+        if (allLinks.length > 0) {
+          console.log(`\n  Todos los links en frame ${frame.url().substring(0, 100)}:`);
+          allLinks.forEach(l => console.log(`    "${l.text}" -> ${l.href}`));
         }
       } catch (e) {}
+    }
+
+    // Try alternative URLs
+    for (const url of alternativeUrls) {
+      try {
+        console.log(`  Probando: ${url}`);
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
+        await page.waitForTimeout(3000);
+
+        const currentUrl = page.url();
+        console.log(`  Resultado: ${currentUrl}`);
+
+        if (!currentUrl.includes('error.aspx') && !currentUrl.includes('Error')) {
+          console.log('  URL alternativa funcionÃ³!');
+          frames = await exploreFrames(page, 'URL alternativa');
+
+          // Look for form in all frames
+          for (const frame of page.frames()) {
+            try {
+              const hasRutField = await frame.locator('input[id*="Rut"], input[id*="rut"]').count();
+              if (hasRutField > 0) {
+                targetFrame = frame;
+                console.log(`  Frame con campo RUT encontrado: ${frame.url()}`);
+                break;
+              }
+            } catch (e) {}
+          }
+          if (targetFrame !== page) break;
+        }
+      } catch (e) {
+        console.log(`  Error: ${e.message}`);
+      }
     }
   }
 
   if (targetFrame === page) {
-    console.log('ADVERTENCIA: No se encontrÃ³ frame con formulario, usando pÃ¡gina principal');
-    // Take debug screenshot
-    await page.screenshot({ path: path.join(__dirname, 'data', 'debug_frames.png') });
+    console.log('\nADVERTENCIA: No se encontrÃ³ frame con formulario de Control de RecepciÃ³n');
+    await page.screenshot({ path: path.join(__dirname, 'data', 'debug_no_form.png'), fullPage: true });
+
+    // Log page HTML structure for debugging
+    const html = await page.content();
+    fs.writeFileSync(path.join(__dirname, 'data', 'debug_page.html'), html);
+    console.log('HTML de la pÃ¡gina guardado en debug_page.html');
   }
 
   return targetFrame;
@@ -171,7 +341,6 @@ async function extractTableData(frame) {
 
 async function getPageCount(frame) {
   return await frame.evaluate(() => {
-    // Look for pagination links - iConstruye uses IrA(n) pattern
     const links = document.querySelectorAll('a[href*="IrA"]');
     let maxPage = 1;
     links.forEach(link => {
@@ -181,7 +350,6 @@ async function getPageCount(frame) {
         if (num > maxPage) maxPage = num;
       }
     });
-    // Also check onclick attributes
     const onclickLinks = document.querySelectorAll('a[onclick*="IrA"]');
     onclickLinks.forEach(link => {
       const match = link.getAttribute('onclick').match(/IrA\((\d+)\)/);
@@ -190,7 +358,6 @@ async function getPageCount(frame) {
         if (num > maxPage) maxPage = num;
       }
     });
-    // Also check for __doPostBack with IrA
     const allLinks = document.querySelectorAll('a[href*="__doPostBack"]');
     allLinks.forEach(link => {
       const match = link.href.match(/IrA.*?(\d+)/);
@@ -208,7 +375,6 @@ async function navigateToPage(frame, pageNum) {
     __doPostBack('IrA', num.toString());
   }, pageNum);
   await frame.waitForTimeout(3000);
-  // Wait for table to be present
   try {
     await frame.waitForSelector('#tblDetalle', { timeout: 15000 });
   } catch (e) {
@@ -220,19 +386,16 @@ async function navigateToPage(frame, pageNum) {
 async function searchByRut(frame, rut) {
   console.log(`Buscando RUT: ${rut}...`);
 
-  // Clear and fill RUT field - wait for it to be visible first
   const rutField = frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').first();
   await rutField.waitFor({ state: 'visible', timeout: 30000 });
   await rutField.fill('');
   await rutField.fill(rut);
   await frame.waitForTimeout(500);
 
-  // Click search button via postback
   await frame.evaluate(() => {
     __doPostBack('btnBuscar', '');
   });
 
-  // Wait for results
   await frame.waitForTimeout(5000);
   try {
     await frame.waitForSelector('#tblDetalle', { timeout: 20000 });
@@ -247,16 +410,13 @@ async function scrapeAllPages(frame, rutInfo) {
 
   let allData = [];
 
-  // Get page count
   const totalPages = await getPageCount(frame);
   console.log(`  Total de pÃ¡ginas: ${totalPages}`);
 
-  // Navigate to page 1 first if needed
   if (totalPages > 1) {
     await navigateToPage(frame, 1);
   }
 
-  // Extract data from each page
   for (let p = 1; p <= totalPages; p++) {
     if (p > 1) {
       await navigateToPage(frame, p);
@@ -292,6 +452,21 @@ async function main() {
   try {
     await login(page);
     const frame = await navigateToControlRecepcion(page);
+
+    // Check if we actually found the form
+    let hasForm = false;
+    try {
+      const rutField = frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]');
+      hasForm = (await rutField.count()) > 0;
+    } catch (e) {}
+
+    if (!hasForm) {
+      console.error('ERROR: No se pudo acceder al formulario de Control de RecepciÃ³n');
+      console.error('Revise los logs de debug para mÃ¡s informaciÃ³n');
+      await page.screenshot({ path: path.join(__dirname, 'data', 'error_screenshot.png') });
+      process.exit(1);
+    }
+
     await setFilters(frame);
 
     const allResults = {};
