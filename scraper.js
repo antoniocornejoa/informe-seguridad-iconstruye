@@ -4,6 +4,7 @@ const path = require('path');
 
 // Configuration
 const ICONSTRUYE_URL = 'https://cl.iconstruye.com';
+const LOGIN_URL = `${ICONSTRUYE_URL}/loginsso.aspx`;
 const CONTROL_RECEPCION_URL = `${ICONSTRUYE_URL}/Recepcion/ControlRecepcion.aspx`;
 const USERNAME = process.env.ICONSTRUYE_USER;
 const PASSWORD = process.env.ICONSTRUYE_PASS;
@@ -21,25 +22,45 @@ const COLUMNS = [
 
 async function login(page) {
   console.log('Iniciando sesiÃ³n en iConstruye...');
-  await page.goto(ICONSTRUYE_URL, { waitUntil: 'networkidle', timeout: 60000 });
+  await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: 60000 });
+  await page.waitForTimeout(2000);
 
-  // Try to find login form - iConstruye may have different login flows
-  // Look for username/email field
-  const userField = await page.locator('input[type="text"], input[type="email"], input[name*="user"], input[name*="User"], input[id*="user"], input[id*="User"], input[id*="txt_usuario"], input[name*="login"]').first();
-  await userField.waitFor({ timeout: 30000 });
-  await userField.fill(USERNAME);
+  // Click on "Ingresa con tu correo" tab to ensure it's active
+  const correoTab = page.locator('a[href="#TabLoginSso"]');
+  if (await correoTab.count() > 0) {
+    await correoTab.click();
+    await page.waitForTimeout(1000);
+  }
 
-  // Look for password field
-  const passField = await page.locator('input[type="password"]').first();
+  // Fill email field
+  const emailField = page.locator('#txtUsuarioSso');
+  await emailField.waitFor({ state: 'visible', timeout: 15000 });
+  await emailField.fill(USERNAME);
+  console.log('Email ingresado');
+
+  // Fill password field
+  const passField = page.locator('#txtPasswordSso');
+  await passField.waitFor({ state: 'visible', timeout: 10000 });
   await passField.fill(PASSWORD);
+  console.log('ContraseÃ±a ingresada');
 
-  // Look for submit/login button
-  const loginBtn = await page.locator('button[type="submit"], input[type="submit"], button:has-text("Ingresar"), button:has-text("Login"), a:has-text("Ingresar"), input[value*="Ingresar"]').first();
+  // Click login button
+  const loginBtn = page.locator('#btnIniciaSessionSso');
   await loginBtn.click();
+  console.log('BotÃ³n de login clickeado');
 
   // Wait for navigation after login
   await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(3000);
+
+  // Verify login was successful by checking URL
+  const currentUrl = page.url();
+  console.log('URL despuÃ©s de login:', currentUrl);
+  if (currentUrl.includes('loginsso')) {
+    // Still on login page - take screenshot for debugging
+    await page.screenshot({ path: path.join(__dirname, 'data', 'login_failed.png') });
+    throw new Error('Login fallÃ³ - aÃºn en pÃ¡gina de login');
+  }
 
   console.log('SesiÃ³n iniciada correctamente');
 }
