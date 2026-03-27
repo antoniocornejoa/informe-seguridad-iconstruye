@@ -5,6 +5,7 @@ const path = require('path');
 // Configuration
 const ICONSTRUYE_URL = 'https://cl.iconstruye.com';
 const LOGIN_URL = `${ICONSTRUYE_URL}/loginsso.aspx`;
+const CONTROL_RECEPCION_URL = `${ICONSTRUYE_URL}/bodega/reportes/control_recepciones_nr.aspx`;
 const USERNAME = process.env.ICONSTRUYE_USER;
 const PASSWORD = process.env.ICONSTRUYE_PASS;
 
@@ -63,234 +64,84 @@ async function login(page) {
   console.log('SesiÃ³n iniciada correctamente');
 }
 
-async function exploreFrames(page, label) {
+async function navigateToControlRecepcion(page) {
+  console.log('Navegando a Control de Recepciones...');
+  console.log('URL:', CONTROL_RECEPCION_URL);
+
+  await page.goto(CONTROL_RECEPCION_URL, { waitUntil: 'networkidle', timeout: 60000 });
+  await page.waitForTimeout(5000);
+
+  const currentUrl = page.url();
+  console.log('URL actual:', currentUrl);
+
+  // Check if redirected to error page
+  if (currentUrl.includes('error.aspx')) {
+    console.log('Redirigido a pÃ¡gina de error, tomando screenshot...');
+    await page.screenshot({ path: path.join(__dirname, 'data', 'debug_error_page.png') });
+    throw new Error(`PÃ¡gina de error: ${currentUrl}`);
+  }
+
+  // Explore frames
   const frames = page.frames();
-  console.log(`${label} - Frames encontrados: ${frames.length}`);
+  console.log(`Frames encontrados: ${frames.length}`);
   for (let i = 0; i < frames.length; i++) {
     try {
-      const url = frames[i].url();
-      console.log(`  Frame ${i}: ${url}`);
-    } catch (e) {
-      console.log(`  Frame ${i}: [inaccesible]`);
-    }
-  }
-  return frames;
-}
-
-async function navigateToControlRecepcion(page) {
-  console.log('=== Explorando pÃ¡gina principal despuÃ©s de login ===');
-
-  // First, explore the main page structure
-  const mainUrl = page.url();
-  console.log('URL principal:', mainUrl);
-
-  let frames = await exploreFrames(page, 'PÃ¡gina principal');
-
-  // Take a screenshot of the main page
-  fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
-  await page.screenshot({ path: path.join(__dirname, 'data', 'debug_main_page.png') });
-
-  // iConstruye uses a frameset - the main content is usually in a frame called "mainFrame" or similar
-  // Try to find menu frame and content frame
-  let menuFrame = null;
-  let contentFrame = null;
-
-  for (const frame of frames) {
-    try {
-      const url = frame.url();
-      if (url.includes('menu') || url.includes('Menu') || url.includes('nav') || url.includes('Nav')) {
-        menuFrame = frame;
-        console.log(`  -> Menu frame encontrado: ${url}`);
-      }
-      if (url.includes('content') || url.includes('Content') || url.includes('main') || url.includes('Main')) {
-        contentFrame = frame;
-        console.log(`  -> Content frame encontrado: ${url}`);
-      }
+      console.log(`  Frame ${i}: ${frames[i].url()}`);
     } catch (e) {}
   }
 
-  // Log all links in each frame to find navigation
-  for (const frame of frames) {
-    try {
-      const url = frame.url();
-      if (url === 'about:blank' || url === '') continue;
-
-      const links = await frame.evaluate(() => {
-        const allLinks = document.querySelectorAll('a');
-        const linkData = [];
-        allLinks.forEach(a => {
-          const href = a.href || '';
-          const text = a.innerText?.trim() || '';
-          const onclick = a.getAttribute('onclick') || '';
-          if ((href.toLowerCase().includes('recepcion') ||
-               text.toLowerCase().includes('recepcion') || text.toLowerCase().includes('recepciÃ³n') ||
-               onclick.toLowerCase().includes('recepcion')) && text.length < 100) {
-            linkData.push({ text, href: href.substring(0, 200), onclick: onclick.substring(0, 200) });
-          }
-        });
-        return linkData;
-      });
-
-      if (links.length > 0) {
-        console.log(`  Links "recepcion" en frame ${url}:`);
-        links.forEach(l => console.log(`    - "${l.text}" -> ${l.href} [onclick: ${l.onclick}]`));
-      }
-    } catch (e) {}
-  }
-
-  // Strategy 1: Try to find and click menu items in any frame
-  console.log('\n=== Estrategia 1: Buscar menÃº de RecepciÃ³n ===');
-
-  for (const frame of frames) {
-    try {
-      // Look for "RecepciÃ³n" or "Control" menu links
-      const recepcionLinks = frame.locator('a:has-text("Recepci"), a:has-text("Control de Recep"), a:has-text("Control Recep")');
-      const count = await recepcionLinks.count();
-
-      if (count > 0) {
-        console.log(`  Encontrados ${count} links de recepciÃ³n en frame ${frame.url()}`);
-        for (let i = 0; i < count; i++) {
-          const text = await recepcionLinks.nth(i).innerText();
-          console.log(`    Link ${i}: "${text.trim()}"`);
-        }
-
-        // Try to click "Control de RecepciÃ³n" first, then "RecepciÃ³n"
-        const controlLink = frame.locator('a:has-text("Control de Recep"), a:has-text("Control Recep")').first();
-        if (await controlLink.count() > 0) {
-          console.log('  Clickeando "Control de RecepciÃ³n"...');
-          await controlLink.click();
-          await page.waitForTimeout(5000);
-
-          // Check if we got to the right page
-          frames = await exploreFrames(page, 'DespuÃ©s de click Control RecepciÃ³n');
-          break;
-        }
-
-        // Otherwise click "RecepciÃ³n" main menu
-        const recepLink = frame.locator('a:has-text("Recepci")').first();
-        if (await recepLink.count() > 0) {
-          console.log('  Clickeando "RecepciÃ³n" menÃº...');
-          await recepLink.click();
-          await page.waitForTimeout(3000);
-
-          // Now look for sub-menu "Control de RecepciÃ³n"
-          frames = await exploreFrames(page, 'DespuÃ©s de click RecepciÃ³n');
-
-          for (const f of page.frames()) {
-            const subLink = f.locator('a:has-text("Control de Recep"), a:has-text("Control Recep")');
-            if (await subLink.count() > 0) {
-              console.log('  Clickeando sub-menÃº "Control de RecepciÃ³n"...');
-              await subLink.first().click();
-              await page.waitForTimeout(5000);
-              frames = await exploreFrames(page, 'DespuÃ©s de click sub-menÃº');
-              break;
-            }
-          }
-          break;
-        }
-      }
-    } catch (e) {
-      console.log(`  Error en frame: ${e.message}`);
-    }
-  }
-
-  // Strategy 2: If direct URL failed before, try navigating within a frame
-  console.log('\n=== Estrategia 2: Buscar frame con formulario ===');
-
-  frames = page.frames();
   let targetFrame = page;
 
+  // Look for the form in all frames
   for (const frame of frames) {
     try {
       const hasRutField = await frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').count();
       const hasBtn = await frame.locator('#btnBuscar, [name="btnBuscar"], input[value="Buscar"]').count();
-      const hasTable = await frame.locator('#tblDetalle').count();
+      const hasTable = await frame.locator('#tblDetalle, table[id*="detalle"], table[id*="Detalle"]').count();
+      const hasAnyInput = await frame.locator('input[type="text"]').count();
+
+      console.log(`  Frame check ${frame.url().substring(0, 80)}: Rut=${hasRutField}, Btn=${hasBtn}, Table=${hasTable}, Inputs=${hasAnyInput}`);
 
       if (hasRutField > 0 || hasBtn > 0 || hasTable > 0) {
-        console.log(`  -> Frame con formulario: ${frame.url()} (Rut: ${hasRutField}, Btn: ${hasBtn}, Tabla: ${hasTable})`);
+        console.log(`  -> Frame seleccionado!`);
         targetFrame = frame;
         break;
       }
     } catch (e) {}
   }
 
-  // Strategy 3: Try navigating to different URL patterns for Control Recepcion
+  // If no form found in frames, check the main page itself
   if (targetFrame === page) {
-    console.log('\n=== Estrategia 3: Probar URLs alternativas ===');
+    const hasRutField = await page.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').count();
+    const hasAnyInput = await page.locator('input[type="text"]').count();
+    console.log(`  Main page check: Rut=${hasRutField}, Inputs=${hasAnyInput}`);
 
-    const alternativeUrls = [
-      `${ICONSTRUYE_URL}/Recepcion/ControlRecepcion.aspx`,
-      `${ICONSTRUYE_URL}/recepcion/controlrecepcion.aspx`,
-      `${ICONSTRUYE_URL}/Recepcion/ControlRecepcion`,
-      `${ICONSTRUYE_URL}/Modules/Recepcion/ControlRecepcion.aspx`,
-      `${ICONSTRUYE_URL}/modules/recepcion/controlrecepcion.aspx`,
-      `${ICONSTRUYE_URL}/App/Recepcion/ControlRecepcion.aspx`,
-    ];
-
-    // First, let's explore all frame URLs and log all links to help debug
-    for (const frame of page.frames()) {
-      try {
-        const allLinks = await frame.evaluate(() => {
-          const links = document.querySelectorAll('a');
-          const result = [];
-          links.forEach(a => {
-            const href = a.href || '';
-            const text = a.innerText?.trim() || '';
-            if (text.length > 0 && text.length < 80) {
-              result.push({ text, href: href.substring(0, 250) });
-            }
+    if (hasRutField > 0) {
+      console.log('  Formulario encontrado en pÃ¡gina principal');
+    } else {
+      // Log all form elements for debugging
+      const formElements = await page.evaluate(() => {
+        const inputs = document.querySelectorAll('input, select, textarea');
+        const result = [];
+        inputs.forEach(el => {
+          result.push({
+            tag: el.tagName,
+            type: el.type || '',
+            id: el.id || '',
+            name: el.name || '',
+            placeholder: el.placeholder || ''
           });
-          return result.slice(0, 50); // Limit to first 50
         });
+        return result.slice(0, 30);
+      });
 
-        if (allLinks.length > 0) {
-          console.log(`\n  Todos los links en frame ${frame.url().substring(0, 100)}:`);
-          allLinks.forEach(l => console.log(`    "${l.text}" -> ${l.href}`));
-        }
-      } catch (e) {}
+      console.log('  Elementos de formulario encontrados:');
+      formElements.forEach(el => {
+        console.log(`    <${el.tag} type="${el.type}" id="${el.id}" name="${el.name}" placeholder="${el.placeholder}">`);
+      });
+
+      await page.screenshot({ path: path.join(__dirname, 'data', 'debug_no_form.png'), fullPage: true });
     }
-
-    // Try alternative URLs
-    for (const url of alternativeUrls) {
-      try {
-        console.log(`  Probando: ${url}`);
-        await page.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
-        await page.waitForTimeout(3000);
-
-        const currentUrl = page.url();
-        console.log(`  Resultado: ${currentUrl}`);
-
-        if (!currentUrl.includes('error.aspx') && !currentUrl.includes('Error')) {
-          console.log('  URL alternativa funcionÃ³!');
-          frames = await exploreFrames(page, 'URL alternativa');
-
-          // Look for form in all frames
-          for (const frame of page.frames()) {
-            try {
-              const hasRutField = await frame.locator('input[id*="Rut"], input[id*="rut"]').count();
-              if (hasRutField > 0) {
-                targetFrame = frame;
-                console.log(`  Frame con campo RUT encontrado: ${frame.url()}`);
-                break;
-              }
-            } catch (e) {}
-          }
-          if (targetFrame !== page) break;
-        }
-      } catch (e) {
-        console.log(`  Error: ${e.message}`);
-      }
-    }
-  }
-
-  if (targetFrame === page) {
-    console.log('\nADVERTENCIA: No se encontrÃ³ frame con formulario de Control de RecepciÃ³n');
-    await page.screenshot({ path: path.join(__dirname, 'data', 'debug_no_form.png'), fullPage: true });
-
-    // Log page HTML structure for debugging
-    const html = await page.content();
-    fs.writeFileSync(path.join(__dirname, 'data', 'debug_page.html'), html);
-    console.log('HTML de la pÃ¡gina guardado en debug_page.html');
   }
 
   return targetFrame;
@@ -303,10 +154,11 @@ async function setFilters(frame) {
   try {
     const selectOC = frame.locator('select[id*="CentroGestion"], select[name*="ddlCentroGestion"]').first();
     if (await selectOC.count() > 0) {
-      await selectOC.selectOption({ index: 0 }); // "Todos" is usually first
+      await selectOC.selectOption({ index: 0 });
+      console.log('  Centro de GestiÃ³n configurado');
     }
   } catch (e) {
-    console.log('No se pudo configurar Centro de GestiÃ³n OC:', e.message);
+    console.log('  No se pudo configurar Centro de GestiÃ³n OC:', e.message);
   }
 
   // Set Fecha inicio to 01-01-2025
@@ -315,9 +167,10 @@ async function setFilters(frame) {
     if (await fechaInput.count() > 0) {
       await fechaInput.fill('');
       await fechaInput.fill('01-01-2025');
+      console.log('  Fecha configurada');
     }
   } catch (e) {
-    console.log('No se pudo configurar fecha:', e.message);
+    console.log('  No se pudo configurar fecha:', e.message);
   }
 
   await frame.waitForTimeout(1000);
@@ -392,15 +245,34 @@ async function searchByRut(frame, rut) {
   await rutField.fill(rut);
   await frame.waitForTimeout(500);
 
-  await frame.evaluate(() => {
-    __doPostBack('btnBuscar', '');
-  });
+  // Try clicking the search button directly first
+  try {
+    const btnBuscar = frame.locator('#btnBuscar, [name="btnBuscar"], input[value="Buscar"], button:has-text("Buscar")').first();
+    if (await btnBuscar.count() > 0) {
+      await btnBuscar.click();
+      console.log('  BotÃ³n Buscar clickeado');
+    } else {
+      // Fallback to postback
+      await frame.evaluate(() => {
+        __doPostBack('btnBuscar', '');
+      });
+      console.log('  PostBack btnBuscar ejecutado');
+    }
+  } catch (e) {
+    // Last resort: try postback
+    await frame.evaluate(() => {
+      __doPostBack('btnBuscar', '');
+    });
+    console.log('  PostBack btnBuscar ejecutado (fallback)');
+  }
 
+  // Wait for results
   await frame.waitForTimeout(5000);
   try {
     await frame.waitForSelector('#tblDetalle', { timeout: 20000 });
+    console.log('  Tabla encontrada');
   } catch (e) {
-    console.log('Tabla no encontrada, esperando mÃ¡s...');
+    console.log('  Tabla no encontrada, esperando mÃ¡s...');
     await frame.waitForTimeout(10000);
   }
 }
@@ -448,6 +320,7 @@ async function main() {
   });
 
   const page = await context.newPage();
+  fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
 
   try {
     await login(page);
@@ -462,11 +335,11 @@ async function main() {
 
     if (!hasForm) {
       console.error('ERROR: No se pudo acceder al formulario de Control de RecepciÃ³n');
-      console.error('Revise los logs de debug para mÃ¡s informaciÃ³n');
       await page.screenshot({ path: path.join(__dirname, 'data', 'error_screenshot.png') });
       process.exit(1);
     }
 
+    console.log('Formulario de Control de RecepciÃ³n encontrado!');
     await setFilters(frame);
 
     const allResults = {};
@@ -481,14 +354,12 @@ async function main() {
 
     // Save raw data
     const outputPath = path.join(__dirname, 'data', 'raw_data.json');
-    fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
     fs.writeFileSync(outputPath, JSON.stringify(allResults, null, 2));
     console.log(`\nDatos guardados en: ${outputPath}`);
     console.log(`Total de registros: ${Object.values(allResults).reduce((acc, r) => acc + r.rows.length, 0)}`);
 
   } catch (error) {
     console.error('Error durante el scraping:', error);
-    // Take screenshot on error
     await page.screenshot({ path: path.join(__dirname, 'data', 'error_screenshot.png') });
     process.exit(1);
   } finally {
