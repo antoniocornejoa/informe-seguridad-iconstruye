@@ -1,0 +1,372 @@
+const fs = require('fs');
+const path = require('path');
+
+const DATA_PATH = path.join(__dirname, 'data', 'raw_data.json');
+const OUTPUT_PATH = path.join(__dirname, 'output', 'informe_seguridad_recepciones.html');
+
+const COLUMNS = [
+  'DocTransporte', 'TipoDoc', 'CentroGestionOC', 'CentroGestionRecibe',
+  'FechaEmision', 'FechaIngreso', 'NNotaRecepcion', 'Usuario',
+  'MontoRecibido', 'Proveedor', 'RUT', 'EstadoDocumento'
+];
+
+function parseMonto(montoStr) {
+  if (!montoStr) return 0;
+  let s = montoStr.replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+}
+
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  // Format: dd-mm-yyyy or dd/mm/yyyy
+  const parts = dateStr.split(/[-\/]/);
+  if (parts.length !== 3) return null;
+  const [d, m, y] = parts;
+  return { day: parseInt(d), month: parseInt(m), year: parseInt(y) };
+}
+
+function processData(rawData) {
+  const records = [];
+  for (const [rut, info] of Object.entries(rawData)) {
+    for (const row of info.rows) {
+      const record = {};
+      COLUMNS.forEach((col, i) => { record[col] = row[i] || ''; });
+      record.montoNum = parseMonto(record.MontoRecibido);
+      const fecha = parseDate(record.FechaEmision);
+      if (fecha) {
+        record.mes = fecha.month;
+        record.anio = fecha.year;
+        record.mesAnio = `${fecha.year}-${String(fecha.month).padStart(2, '0')}`;
+      }
+      records.push(record);
+    }
+  }
+  return records;
+}
+
+function generateHTML(records) {
+  const now = new Date();
+  const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  // Calculate date range
+  const years = [...new Set(records.map(r => r.anio).filter(Boolean))].sort();
+  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+  const allDates = records.filter(r => r.mes && r.anio).map(r => ({ m: r.mes, y: r.anio }));
+  let minDate = 'N/A', maxDate = 'N/A';
+  if (allDates.length > 0) {
+    allDates.sort((a, b) => a.y - b.y || a.m - b.m);
+    minDate = `${months[allDates[0].m - 1]} ${allDates[0].y}`;
+    maxDate = `${months[allDates[allDates.length - 1].m - 1]} ${allDates[allDates.length - 1].y}`;
+  }
+
+  const dataJSON = JSON.stringify(records);
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe Gasto Seguridad - Control de Recepciones</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; color: #333; }
+.header { background: linear-gradient(135deg, #1a237e, #283593); color: white; padding: 20px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+.header h1 { font-size: 22px; font-weight: 600; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+.filters { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; gap: 15px; flex-wrap: wrap; align-items: end; }
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; }
+.filter-group select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 180px; }
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.kpi { background: white; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.kpi .label { font-size: 12px; color: #777; text-transform: uppercase; font-weight: 600; }
+.kpi .value { font-size: 26px; font-weight: 700; color: #1a237e; margin-top: 4px; }
+.kpi .sub { font-size: 12px; color: #999; margin-top: 2px; }
+.section { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.section h2 { font-size: 16px; color: #1a237e; margin-bottom: 15px; border-bottom: 2px solid #e8eaf6; padding-bottom: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #e8eaf6; color: #1a237e; padding: 10px 8px; text-align: left; font-weight: 600; position: sticky; top: 0; }
+td { padding: 8px; border-bottom: 1px solid #eee; }
+tr:hover { background: #f5f5f5; }
+.monto { text-align: right; font-family: 'Courier New', monospace; }
+.total-row { background: #e8eaf6 !important; font-weight: 700; }
+.tab-container { display: flex; gap: 5px; margin-bottom: 15px; }
+.tab { padding: 8px 16px; border: none; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 13px; font-weight: 600; background: #e0e0e0; color: #555; transition: all 0.2s; }
+.tab.active { background: #1a237e; color: white; }
+.tab:hover { opacity: 0.85; }
+.chart-container { height: 300px; position: relative; margin: 15px 0; }
+.bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 250px; padding: 0 10px; border-bottom: 2px solid #ddd; }
+.bar-group { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 30px; }
+.bars-wrapper { display: flex; gap: 2px; width: 100%; align-items: flex-end; }
+.bar { flex: 1; min-width: 10px; border-radius: 4px 4px 0 0; transition: height 0.3s; cursor: pointer; position: relative; }
+.bar.vsm { background: linear-gradient(180deg, #42a5f5, #1565c0); }
+.bar.guardias { background: linear-gradient(180deg, #66bb6a, #2e7d32); }
+.bar:hover { opacity: 0.8; }
+.bar-label { font-size: 10px; color: #777; margin-top: 4px; text-align: center; }
+.legend { display: flex; gap: 20px; margin: 10px 0; justify-content: center; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.legend-dot { width: 14px; height: 14px; border-radius: 3px; }
+.scrollable { max-height: 500px; overflow-y: auto; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge-active { background: #e8f5e9; color: #2e7d32; }
+.badge-anulado { background: #ffebee; color: #c62828; }
+.tooltip { position: absolute; background: rgba(0,0,0,0.85); color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; pointer-events: none; z-index: 100; white-space: nowrap; display: none; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Informe de Gasto de Seguridad - Control de Recepciones</h1>
+  <p>Datos extraidos de iConstruye | Periodo: ${minDate} - ${maxDate} | Generado: ${dateStr}</p>
+</div>
+<div class="container">
+  <div class="filters">
+    <div class="filter-group">
+      <label>Proveedor</label>
+      <select id="filterProveedor"><option value="todos">Todos</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Obra</label>
+      <select id="filterObra"><option value="todas">Todas</option></select>
+    </div>
+    <div class="filter-group">
+      <label>AÃ±o</label>
+      <select id="filterAnio"><option value="todos">Todos</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Estado</label>
+      <select id="filterEstado">
+        <option value="activos">Solo Activos</option>
+        <option value="todos">Todos</option>
+        <option value="Anulado">Solo Anulados</option>
+      </select>
+    </div>
+  </div>
+  <div class="kpi-row" id="kpis"></div>
+  <div class="section">
+    <h2>Gasto Mensual por Proveedor</h2>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#1565c0"></div>VSM ASOCIADOS SPA</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2e7d32"></div>Soc. Guardias de Talca</div>
+    </div>
+    <div class="chart-container"><div class="bar-chart" id="monthlyChart"></div></div>
+    <div id="monthLabels" style="display:flex;gap:4px;padding:0 10px;"></div>
+  </div>
+  <div class="section">
+    <div class="tab-container" id="viewTabs">
+      <button class="tab active" onclick="showView('obra')">Por Obra</button>
+      <button class="tab" onclick="showView('mes')">Por Mes</button>
+      <button class="tab" onclick="showView('detalle')">Detalle</button>
+    </div>
+    <div id="viewObra" class="scrollable"></div>
+    <div id="viewMes" class="scrollable" style="display:none"></div>
+    <div id="viewDetalle" class="scrollable" style="display:none"></div>
+  </div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = ${dataJSON};
+const MESES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MESES_FULL = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function formatMonto(n) {
+  if (n == null || isNaN(n)) return '$0';
+  const neg = n < 0;
+  n = Math.abs(Math.round(n));
+  let s = n.toString();
+  let r = '';
+  for (let i = s.length - 1, c = 0; i >= 0; i--, c++) {
+    if (c > 0 && c % 3 === 0) r = '.' + r;
+    r = s[i] + r;
+  }
+  return (neg ? '-' : '') + '$' + r;
+}
+
+function getFiltered() {
+  const prov = document.getElementById('filterProveedor').value;
+  const obra = document.getElementById('filterObra').value;
+  const anio = document.getElementById('filterAnio').value;
+  const estado = document.getElementById('filterEstado').value;
+  return DATA.filter(r => {
+    if (prov !== 'todos' && r.RUT !== prov) return false;
+    if (obra !== 'todas' && r.CentroGestionRecibe !== obra) return false;
+    if (anio !== 'todos' && String(r.anio) !== anio) return false;
+    if (estado === 'activos' && r.EstadoDocumento === 'Anulado') return false;
+    if (estado === 'Anulado' && r.EstadoDocumento !== 'Anulado') return false;
+    return true;
+  });
+}
+
+function initFilters() {
+  const provs = [...new Set(DATA.map(r => r.RUT))].sort();
+  const sel = document.getElementById('filterProveedor');
+  provs.forEach(p => {
+    const name = DATA.find(r => r.RUT === p)?.Proveedor || p;
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = name + ' (' + p + ')';
+    sel.appendChild(opt);
+  });
+  const obras = [...new Set(DATA.map(r => r.CentroGestionRecibe))].filter(Boolean).sort();
+  const selO = document.getElementById('filterObra');
+  obras.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o; opt.textContent = o;
+    selO.appendChild(opt);
+  });
+  const anios = [...new Set(DATA.map(r => r.anio).filter(Boolean))].sort();
+  const selA = document.getElementById('filterAnio');
+  anios.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a; opt.textContent = a;
+    selA.appendChild(opt);
+  });
+  ['filterProveedor','filterObra','filterAnio','filterEstado'].forEach(id => {
+    document.getElementById(id).addEventListener('change', refresh);
+  });
+}
+
+function updateKPIs(data) {
+  const total = data.reduce((s, r) => s + r.montoNum, 0);
+  const obras = new Set(data.map(r => r.CentroGestionRecibe).filter(Boolean));
+  const avgObra = obras.size > 0 ? total / obras.size : 0;
+  document.getElementById('kpis').innerHTML =
+    '<div class="kpi"><div class="label">Monto Total</div><div class="value">' + formatMonto(total) + '</div><div class="sub">' + data.length + ' documentos</div></div>' +
+    '<div class="kpi"><div class="label">Obras</div><div class="value">' + obras.size + '</div><div class="sub">con recepciones</div></div>' +
+    '<div class="kpi"><div class="label">Promedio por Obra</div><div class="value">' + formatMonto(avgObra) + '</div></div>' +
+    '<div class="kpi"><div class="label">VSM Asociados</div><div class="value">' + formatMonto(data.filter(r => r.RUT === '76230752-9').reduce((s, r) => s + r.montoNum, 0)) + '</div></div>' +
+    '<div class="kpi"><div class="label">Guardias de Talca</div><div class="value">' + formatMonto(data.filter(r => r.RUT === '77543490-2').reduce((s, r) => s + r.montoNum, 0)) + '</div></div>';
+}
+
+function updateChart(data) {
+  const byMonth = {};
+  data.forEach(r => {
+    if (!r.mesAnio) return;
+    if (!byMonth[r.mesAnio]) byMonth[r.mesAnio] = { vsm: 0, guardias: 0 };
+    if (r.RUT === '76230752-9') byMonth[r.mesAnio].vsm += r.montoNum;
+    else byMonth[r.mesAnio].guardias += r.montoNum;
+  });
+  const sortedMonths = Object.keys(byMonth).sort();
+  const maxVal = Math.max(...sortedMonths.map(m => Math.max(byMonth[m].vsm, byMonth[m].guardias)), 1);
+  const chart = document.getElementById('monthlyChart');
+  const labels = document.getElementById('monthLabels');
+  chart.innerHTML = '';
+  labels.innerHTML = '';
+  sortedMonths.forEach(m => {
+    const d = byMonth[m];
+    const [y, mo] = m.split('-');
+    const h1 = Math.max(2, (d.vsm / maxVal) * 240);
+    const h2 = Math.max(2, (d.guardias / maxVal) * 240);
+    chart.innerHTML +=
+      '<div class="bar-group">' +
+        '<div class="bars-wrapper">' +
+          '<div class="bar vsm" style="height:' + h1 + 'px" title="VSM: ' + formatMonto(d.vsm) + '"></div>' +
+          '<div class="bar guardias" style="height:' + h2 + 'px" title="Guardias: ' + formatMonto(d.guardias) + '"></div>' +
+        '</div>' +
+      '</div>';
+    labels.innerHTML += '<div class="bar-group"><div class="bar-label">' + MESES[parseInt(mo)] + ' ' + y.slice(2) + '</div></div>';
+  });
+}
+
+function renderObraTable(data) {
+  const byObra = {};
+  data.forEach(r => {
+    const k = r.CentroGestionRecibe || 'Sin Obra';
+    if (!byObra[k]) byObra[k] = { total: 0, count: 0, vsm: 0, guardias: 0 };
+    byObra[k].total += r.montoNum;
+    byObra[k].count++;
+    if (r.RUT === '76230752-9') byObra[k].vsm += r.montoNum;
+    else byObra[k].guardias += r.montoNum;
+  });
+  const sorted = Object.entries(byObra).sort((a, b) => b[1].total - a[1].total);
+  let html = '<table><tr><th>Obra</th><th>Docs</th><th class="monto">VSM Asociados</th><th class="monto">Guardias Talca</th><th class="monto">Total</th></tr>';
+  let grandTotal = 0, grandVsm = 0, grandGuardias = 0, grandCount = 0;
+  sorted.forEach(([obra, d]) => {
+    html += '<tr><td>' + obra + '</td><td>' + d.count + '</td><td class="monto">' + formatMonto(d.vsm) + '</td><td class="monto">' + formatMonto(d.guardias) + '</td><td class="monto">' + formatMonto(d.total) + '</td></tr>';
+    grandTotal += d.total; grandVsm += d.vsm; grandGuardias += d.guardias; grandCount += d.count;
+  });
+  html += '<tr class="total-row"><td>TOTAL (' + sorted.length + ' obras)</td><td>' + grandCount + '</td><td class="monto">' + formatMonto(grandVsm) + '</td><td class="monto">' + formatMonto(grandGuardias) + '</td><td class="monto">' + formatMonto(grandTotal) + '</td></tr>';
+  html += '</table>';
+  document.getElementById('viewObra').innerHTML = html;
+}
+
+function renderMesTable(data) {
+  const byMes = {};
+  data.forEach(r => {
+    if (!r.mesAnio) return;
+    if (!byMes[r.mesAnio]) byMes[r.mesAnio] = { total: 0, count: 0, vsm: 0, guardias: 0 };
+    byMes[r.mesAnio].total += r.montoNum;
+    byMes[r.mesAnio].count++;
+    if (r.RUT === '76230752-9') byMes[r.mesAnio].vsm += r.montoNum;
+    else byMes[r.mesAnio].guardias += r.montoNum;
+  });
+  const sorted = Object.entries(byMes).sort((a, b) => a[0].localeCompare(b[0]));
+  let html = '<table><tr><th>Periodo</th><th>Docs</th><th class="monto">VSM Asociados</th><th class="monto">Guardias Talca</th><th class="monto">Total</th></tr>';
+  let grandTotal = 0, grandVsm = 0, grandGuardias = 0, grandCount = 0;
+  sorted.forEach(([mes, d]) => {
+    const [y, m] = mes.split('-');
+    html += '<tr><td>' + MESES_FULL[parseInt(m)] + ' ' + y + '</td><td>' + d.count + '</td><td class="monto">' + formatMonto(d.vsm) + '</td><td class="monto">' + formatMonto(d.guardias) + '</td><td class="monto">' + formatMonto(d.total) + '</td></tr>';
+    grandTotal += d.total; grandVsm += d.vsm; grandGuardias += d.guardias; grandCount += d.count;
+  });
+  html += '<tr class="total-row"><td>TOTAL</td><td>' + grandCount + '</td><td class="monto">' + formatMonto(grandVsm) + '</td><td class="monto">' + formatMonto(grandGuardias) + '</td><td class="monto">' + formatMonto(grandTotal) + '</td></tr>';
+  html += '</table>';
+  document.getElementById('viewMes').innerHTML = html;
+}
+
+function renderDetalleTable(data) {
+  let html = '<table><tr><th>Fecha</th><th>Obra</th><th>Proveedor</th><th>NÂ° RecepciÃ³n</th><th class="monto">Monto</th><th>Estado</th></tr>';
+  const sorted = [...data].sort((a, b) => (b.mesAnio || '').localeCompare(a.mesAnio || ''));
+  sorted.forEach(r => {
+    const badge = r.EstadoDocumento === 'Anulado' ? 'badge-anulado' : 'badge-active';
+    html += '<tr><td>' + r.FechaEmision + '</td><td>' + r.CentroGestionRecibe + '</td><td>' + r.Proveedor + '</td><td>' + r.NNotaRecepcion + '</td><td class="monto">' + formatMonto(r.montoNum) + '</td><td><span class="badge ' + badge + '">' + r.EstadoDocumento + '</span></td></tr>';
+  });
+  html += '</table>';
+  document.getElementById('viewDetalle').innerHTML = html;
+}
+
+function showView(view) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.scrollable').forEach(v => v.style.display = 'none');
+  event.target.classList.add('active');
+  if (view === 'obra') document.getElementById('viewObra').style.display = '';
+  else if (view === 'mes') document.getElementById('viewMes').style.display = '';
+  else document.getElementById('viewDetalle').style.display = '';
+}
+
+function refresh() {
+  const data = getFiltered();
+  updateKPIs(data);
+  updateChart(data);
+  renderObraTable(data);
+  renderMesTable(data);
+  renderDetalleTable(data);
+}
+
+initFilters();
+refresh();
+</script>
+</body>
+</html>`;
+}
+
+// Main
+function main() {
+  if (!fs.existsSync(DATA_PATH)) {
+    console.error('Error: No se encontrÃ³ el archivo de datos:', DATA_PATH);
+    console.error('Ejecuta primero: npm run scrape');
+    process.exit(1);
+  }
+
+  const rawData = JSON.parse(fs.readFileSync(DATA_PATH, 'utf-8'));
+  const records = processData(rawData);
+  console.log(`Procesados ${records.length} registros`);
+
+  const html = generateHTML(records);
+  fs.mkdirSync(path.join(__dirname, 'output'), { recursive: true });
+  fs.writeFileSync(OUTPUT_PATH, html);
+  console.log(`Informe generado: ${OUTPUT_PATH}`);
+}
+
+main();
