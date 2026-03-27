@@ -68,30 +68,59 @@ async function login(page) {
 async function navigateToControlRecepcion(page) {
   console.log('Navegando a Control de Recepciones...');
   await page.goto(CONTROL_RECEPCION_URL, { waitUntil: 'networkidle', timeout: 60000 });
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(5000);
 
-  // Check if page loaded inside iframe - iConstruye uses iframes
+  // Log current URL and frames for debugging
+  console.log('URL actual:', page.url());
   const frames = page.frames();
+  console.log(`Frames encontrados: ${frames.length}`);
+  for (let i = 0; i < frames.length; i++) {
+    try {
+      console.log(`  Frame ${i}: ${frames[i].url()}`);
+    } catch (e) {}
+  }
+
   let targetFrame = page;
+
+  // Try to find the frame containing the search form or table
   for (const frame of frames) {
     try {
+      // Check for common elements in iConstruye Control de Recepcion
+      const hasRutField = await frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').count();
+      const hasBtn = await frame.locator('#btnBuscar, [name="btnBuscar"], input[value="Buscar"]').count();
       const hasTable = await frame.locator('#tblDetalle').count();
-      if (hasTable > 0) {
+
+      if (hasRutField > 0 || hasBtn > 0 || hasTable > 0) {
+        console.log(`  -> Frame seleccionado: ${frame.url()} (Rut: ${hasRutField}, Btn: ${hasBtn}, Tabla: ${hasTable})`);
         targetFrame = frame;
         break;
       }
     } catch (e) { /* skip inaccessible frames */ }
   }
 
-  // Also check for the search form
-  for (const frame of frames) {
-    try {
-      const hasBtn = await frame.locator('#btnBuscar, [name="btnBuscar"]').count();
-      if (hasBtn > 0) {
-        targetFrame = frame;
-        break;
-      }
-    } catch (e) {}
+  // If still on main page, wait more and try again
+  if (targetFrame === page && frames.length > 1) {
+    console.log('Frame no encontrado, esperando mÃ¡s...');
+    await page.waitForTimeout(5000);
+
+    const frames2 = page.frames();
+    for (const frame of frames2) {
+      try {
+        const hasRutField = await frame.locator('input[id*="Rut"], input[id*="rut"]').count();
+        const hasAnyInput = await frame.locator('input[type="text"]').count();
+        console.log(`  Frame retry: ${frame.url()} (Rut: ${hasRutField}, inputs: ${hasAnyInput})`);
+        if (hasRutField > 0) {
+          targetFrame = frame;
+          break;
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (targetFrame === page) {
+    console.log('ADVERTENCIA: No se encontrÃ³ frame con formulario, usando pÃ¡gina principal');
+    // Take debug screenshot
+    await page.screenshot({ path: path.join(__dirname, 'data', 'debug_frames.png') });
   }
 
   return targetFrame;
@@ -191,8 +220,9 @@ async function navigateToPage(frame, pageNum) {
 async function searchByRut(frame, rut) {
   console.log(`Buscando RUT: ${rut}...`);
 
-  // Clear and fill RUT field
+  // Clear and fill RUT field - wait for it to be visible first
   const rutField = frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').first();
+  await rutField.waitFor({ state: 'visible', timeout: 30000 });
   await rutField.fill('');
   await rutField.fill(rut);
   await frame.waitForTimeout(500);
