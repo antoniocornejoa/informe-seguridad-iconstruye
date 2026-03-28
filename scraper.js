@@ -25,74 +25,60 @@ async function login(page) {
   await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(2000);
 
-  // Click on "Ingresa con tu correo" tab to ensure it's active
   const correoTab = page.locator('a[href="#TabLoginSso"]');
   if (await correoTab.count() > 0) {
     await correoTab.click();
     await page.waitForTimeout(1000);
   }
 
-  // Fill email field
   const emailField = page.locator('#txtUsuarioSso');
   await emailField.waitFor({ state: 'visible', timeout: 15000 });
   await emailField.fill(USERNAME);
   console.log('Email ingresado');
 
-  // Fill password field
   const passField = page.locator('#txtPasswordSso');
   await passField.waitFor({ state: 'visible', timeout: 10000 });
   await passField.fill(PASSWORD);
   console.log('ContraseÃ±a ingresada');
 
-  // Click login button
   const loginBtn = page.locator('#btnIniciaSessionSso');
   await loginBtn.click();
   console.log('BotÃ³n de login clickeado');
 
-  // Wait for navigation after login
   await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(3000);
 
-  // Verify login was successful by checking URL
   const currentUrl = page.url();
   console.log('URL despuÃ©s de login:', currentUrl);
   if (currentUrl.includes('loginsso')) {
     await page.screenshot({ path: path.join(__dirname, 'data', 'login_failed.png') });
     throw new Error('Login fallÃ³ - aÃºn en pÃ¡gina de login');
   }
-
   console.log('SesiÃ³n iniciada correctamente');
 }
 
 async function navigateToControlRecepcion(page) {
   console.log('Navegando a Control de Recepciones...');
   console.log('URL:', CONTROL_RECEPCION_URL);
-
   await page.goto(CONTROL_RECEPCION_URL, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(5000);
 
   const currentUrl = page.url();
   console.log('URL actual:', currentUrl);
 
-  // Check if redirected to error page
   if (currentUrl.includes('error.aspx')) {
-    console.log('Redirigido a pÃ¡gina de error, tomando screenshot...');
     await page.screenshot({ path: path.join(__dirname, 'data', 'debug_error_page.png') });
     throw new Error(`PÃ¡gina de error: ${currentUrl}`);
   }
 
-  // Explore frames
   const frames = page.frames();
   console.log(`Frames encontrados: ${frames.length}`);
   for (let i = 0; i < frames.length; i++) {
-    try {
-      console.log(`  Frame ${i}: ${frames[i].url()}`);
-    } catch (e) {}
+    try { console.log(`  Frame ${i}: ${frames[i].url()}`); } catch (e) {}
   }
 
   let targetFrame = page;
 
-  // Look for the form in all frames
   for (const frame of frames) {
     try {
       const hasRutField = await frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').count();
@@ -110,45 +96,81 @@ async function navigateToControlRecepcion(page) {
     } catch (e) {}
   }
 
-  // If no form found in frames, check the main page itself
-  if (targetFrame === page) {
-    const hasRutField = await page.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').count();
-    const hasAnyInput = await page.locator('input[type="text"]').count();
-    console.log(`  Main page check: Rut=${hasRutField}, Inputs=${hasAnyInput}`);
-
-    if (hasRutField > 0) {
-      console.log('  Formulario encontrado en pÃ¡gina principal');
-    } else {
-      // Log all form elements for debugging
-      const formElements = await page.evaluate(() => {
-        const inputs = document.querySelectorAll('input, select, textarea');
-        const result = [];
-        inputs.forEach(el => {
-          result.push({
-            tag: el.tagName,
-            type: el.type || '',
-            id: el.id || '',
-            name: el.name || '',
-            placeholder: el.placeholder || ''
-          });
-        });
-        return result.slice(0, 30);
-      });
-
-      console.log('  Elementos de formulario encontrados:');
-      formElements.forEach(el => {
-        console.log(`    <${el.tag} type="${el.type}" id="${el.id}" name="${el.name}" placeholder="${el.placeholder}">`);
-      });
-
-      await page.screenshot({ path: path.join(__dirname, 'data', 'debug_no_form.png'), fullPage: true });
-    }
-  }
-
   return targetFrame;
 }
 
-async function setFilters(frame) {
+async function debugFormElements(frame, page) {
+  console.log('\n=== DEBUG: Elementos del formulario ===');
+
+  // Get ALL form elements with their details
+  const elements = await frame.evaluate(() => {
+    const result = [];
+    // Inputs
+    document.querySelectorAll('input').forEach(el => {
+      result.push({
+        tag: 'input',
+        type: el.type || '',
+        id: el.id || '',
+        name: el.name || '',
+        value: el.value || '',
+        placeholder: el.placeholder || '',
+        visible: el.offsetParent !== null
+      });
+    });
+    // Selects
+    document.querySelectorAll('select').forEach(el => {
+      const options = [];
+      el.querySelectorAll('option').forEach(opt => {
+        options.push({ value: opt.value, text: opt.text, selected: opt.selected });
+      });
+      result.push({
+        tag: 'select',
+        id: el.id || '',
+        name: el.name || '',
+        selectedValue: el.value,
+        options: options.slice(0, 10),
+        visible: el.offsetParent !== null
+      });
+    });
+    // Tables
+    document.querySelectorAll('table').forEach(el => {
+      const rows = el.querySelectorAll('tr');
+      result.push({
+        tag: 'table',
+        id: el.id || '',
+        className: el.className || '',
+        rows: rows.length,
+        visible: el.offsetParent !== null
+      });
+    });
+    return result;
+  });
+
+  elements.forEach(el => {
+    if (el.tag === 'input') {
+      console.log(`  <input type="${el.type}" id="${el.id}" name="${el.name}" value="${el.value}" placeholder="${el.placeholder}" visible=${el.visible}>`);
+    } else if (el.tag === 'select') {
+      console.log(`  <select id="${el.id}" name="${el.name}" selected="${el.selectedValue}" visible=${el.visible}>`);
+      el.options.forEach(opt => {
+        console.log(`    <option value="${opt.value}" ${opt.selected ? 'SELECTED' : ''}>${opt.text}</option>`);
+      });
+    } else if (el.tag === 'table') {
+      console.log(`  <table id="${el.id}" class="${el.className}" rows=${el.rows} visible=${el.visible}>`);
+    }
+  });
+
+  // Take screenshot of form
+  await page.screenshot({ path: path.join(__dirname, 'data', 'debug_form.png'), fullPage: true });
+  console.log('=== FIN DEBUG ===\n');
+
+  return elements;
+}
+
+async function setFilters(frame, page) {
   console.log('Configurando filtros...');
+
+  // Debug: log all form elements first
+  const elements = await debugFormElements(frame, page);
 
   // Set Centro de GestiÃ³n OC to "Todos"
   try {
@@ -156,22 +178,69 @@ async function setFilters(frame) {
     if (await selectOC.count() > 0) {
       await selectOC.selectOption({ index: 0 });
       console.log('  Centro de GestiÃ³n configurado');
+    } else {
+      console.log('  Centro de GestiÃ³n select NO encontrado');
     }
   } catch (e) {
-    console.log('  No se pudo configurar Centro de GestiÃ³n OC:', e.message);
+    console.log('  Error configurando Centro de GestiÃ³n:', e.message);
   }
 
-  // Set Fecha inicio to 01-01-2025
-  try {
-    const fechaInput = frame.locator('input[id*="fecha"], input[id*="Fecha"], input[name*="fecha"], input[name*="Fecha"]').first();
-    if (await fechaInput.count() > 0) {
-      await fechaInput.fill('');
-      await fechaInput.fill('01-01-2025');
-      console.log('  Fecha configurada');
+  // Try multiple strategies for date fields
+  console.log('Buscando campos de fecha...');
+
+  // Strategy 1: Look for any input with date-like ids
+  const dateSelectors = [
+    'input[id*="fecha"]', 'input[id*="Fecha"]',
+    'input[id*="date"]', 'input[id*="Date"]',
+    'input[id*="fDesde"]', 'input[id*="fHasta"]',
+    'input[id*="desde"]', 'input[id*="hasta"]',
+    'input[id*="Desde"]', 'input[id*="Hasta"]',
+    'input[id*="Inicio"]', 'input[id*="Fin"]',
+    'input[id*="inicio"]', 'input[id*="fin"]',
+    'input[name*="fecha"]', 'input[name*="Fecha"]',
+    'input[name*="date"]', 'input[name*="Date"]',
+    'input[name*="Desde"]', 'input[name*="Hasta"]'
+  ];
+
+  for (const sel of dateSelectors) {
+    const count = await frame.locator(sel).count();
+    if (count > 0) {
+      console.log(`  Encontrado campo fecha con selector "${sel}" (${count} elementos)`);
+      try {
+        const field = frame.locator(sel).first();
+        const fieldId = await field.getAttribute('id');
+        const fieldName = await field.getAttribute('name');
+        const fieldValue = await field.inputValue();
+        console.log(`    id="${fieldId}" name="${fieldName}" valor actual="${fieldValue}"`);
+        // Try to set it
+        await field.fill('');
+        await field.fill('01-01-2025');
+        const newValue = await field.inputValue();
+        console.log(`    Nuevo valor="${newValue}"`);
+      } catch (e) {
+        console.log(`    Error al llenar: ${e.message}`);
+      }
     }
-  } catch (e) {
-    console.log('  No se pudo configurar fecha:', e.message);
   }
+
+  // Strategy 2: Check for text inputs that currently contain date-like values
+  const textInputs = await frame.locator('input[type="text"]').all();
+  console.log(`\n  Revisando ${textInputs.length} inputs de texto por valores de fecha...`);
+  for (let i = 0; i < textInputs.length; i++) {
+    try {
+      const id = await textInputs[i].getAttribute('id') || '';
+      const name = await textInputs[i].getAttribute('name') || '';
+      const value = await textInputs[i].inputValue();
+      if (value && (value.match(/\d{2}[-\/]\d{2}[-\/]\d{4}/) || value.match(/\d{4}[-\/]\d{2}[-\/]\d{2}/))) {
+        console.log(`    FECHA encontrada! input[${i}] id="${id}" name="${name}" value="${value}"`);
+      } else if (id || name) {
+        console.log(`    input[${i}] id="${id}" name="${name}" value="${value}"`);
+      }
+    } catch (e) {}
+  }
+
+  // Take screenshot after filters
+  await page.screenshot({ path: path.join(__dirname, 'data', 'debug_after_filters.png'), fullPage: true });
 
   await frame.waitForTimeout(1000);
 }
@@ -180,8 +249,10 @@ async function extractTableData(frame) {
   return await frame.evaluate(() => {
     const table = document.getElementById('tblDetalle');
     if (!table) return [];
+
     const rows = table.querySelectorAll('tr');
     const data = [];
+
     for (let i = 1; i < rows.length; i++) {
       const cells = rows[i].querySelectorAll('td');
       const row = [];
@@ -203,6 +274,7 @@ async function getPageCount(frame) {
         if (num > maxPage) maxPage = num;
       }
     });
+
     const onclickLinks = document.querySelectorAll('a[onclick*="IrA"]');
     onclickLinks.forEach(link => {
       const match = link.getAttribute('onclick').match(/IrA\((\d+)\)/);
@@ -211,6 +283,7 @@ async function getPageCount(frame) {
         if (num > maxPage) maxPage = num;
       }
     });
+
     const allLinks = document.querySelectorAll('a[href*="__doPostBack"]');
     allLinks.forEach(link => {
       const match = link.href.match(/IrA.*?(\d+)/);
@@ -245,29 +318,22 @@ async function searchByRut(frame, rut) {
   await rutField.fill(rut);
   await frame.waitForTimeout(500);
 
-  // Try clicking the search button directly first
   try {
     const btnBuscar = frame.locator('#btnBuscar, [name="btnBuscar"], input[value="Buscar"], button:has-text("Buscar")').first();
     if (await btnBuscar.count() > 0) {
       await btnBuscar.click();
       console.log('  BotÃ³n Buscar clickeado');
     } else {
-      // Fallback to postback
-      await frame.evaluate(() => {
-        __doPostBack('btnBuscar', '');
-      });
+      await frame.evaluate(() => { __doPostBack('btnBuscar', ''); });
       console.log('  PostBack btnBuscar ejecutado');
     }
   } catch (e) {
-    // Last resort: try postback
-    await frame.evaluate(() => {
-      __doPostBack('btnBuscar', '');
-    });
+    await frame.evaluate(() => { __doPostBack('btnBuscar', ''); });
     console.log('  PostBack btnBuscar ejecutado (fallback)');
   }
 
-  // Wait for results
   await frame.waitForTimeout(5000);
+
   try {
     await frame.waitForSelector('#tblDetalle', { timeout: 20000 });
     console.log('  Tabla encontrada');
@@ -275,13 +341,52 @@ async function searchByRut(frame, rut) {
     console.log('  Tabla no encontrada, esperando mÃ¡s...');
     await frame.waitForTimeout(10000);
   }
+
+  // Debug: log table HTML structure
+  const tableInfo = await frame.evaluate(() => {
+    const table = document.getElementById('tblDetalle');
+    if (!table) return { found: false };
+    const rows = table.querySelectorAll('tr');
+    const headerCells = rows[0] ? Array.from(rows[0].querySelectorAll('th, td')).map(c => c.innerText.trim()) : [];
+    const firstRowCells = rows[1] ? Array.from(rows[1].querySelectorAll('td')).map(c => c.innerText.trim()) : [];
+    return {
+      found: true,
+      totalRows: rows.length,
+      headers: headerCells,
+      firstRow: firstRowCells,
+      outerHTML: table.outerHTML.substring(0, 2000)
+    };
+  });
+
+  console.log(`  Tabla info: ${JSON.stringify({
+    found: tableInfo.found,
+    rows: tableInfo.totalRows,
+    headers: tableInfo.headers,
+    firstRow: tableInfo.firstRow
+  }, null, 0)}`);
+
+  if (tableInfo.totalRows <= 1) {
+    // Also log any message on the page that says "no results"
+    const noResults = await frame.evaluate(() => {
+      const body = document.body.innerText;
+      const lines = body.split('\n').filter(l => l.trim());
+      return lines.filter(l =>
+        l.toLowerCase().includes('no hay') ||
+        l.toLowerCase().includes('sin resultado') ||
+        l.toLowerCase().includes('no se encontr') ||
+        l.toLowerCase().includes('0 registro')
+      );
+    });
+    if (noResults.length > 0) {
+      console.log(`  Mensajes de sin resultados: ${JSON.stringify(noResults)}`);
+    }
+  }
 }
 
 async function scrapeAllPages(frame, rutInfo) {
   await searchByRut(frame, rutInfo.rut);
 
   let allData = [];
-
   const totalPages = await getPageCount(frame);
   console.log(`  Total de pÃ¡ginas: ${totalPages}`);
 
@@ -293,7 +398,6 @@ async function scrapeAllPages(frame, rutInfo) {
     if (p > 1) {
       await navigateToPage(frame, p);
     }
-
     const pageData = await extractTableData(frame);
     console.log(`  PÃ¡gina ${p}: ${pageData.length} filas`);
     allData = allData.concat(pageData);
@@ -326,7 +430,6 @@ async function main() {
     await login(page);
     const frame = await navigateToControlRecepcion(page);
 
-    // Check if we actually found the form
     let hasForm = false;
     try {
       const rutField = frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]');
@@ -340,7 +443,7 @@ async function main() {
     }
 
     console.log('Formulario de Control de RecepciÃ³n encontrado!');
-    await setFilters(frame);
+    await setFilters(frame, page);
 
     const allResults = {};
 
