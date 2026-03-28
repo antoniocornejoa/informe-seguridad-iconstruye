@@ -16,8 +16,9 @@ const RUTS = [
 
 const COLUMNS = [
   'DocTransporte', 'TipoDoc', 'CentroGestionOC', 'CentroGestionRecibe',
-  'FechaEmision', 'FechaIngreso', 'NNotaRecepcion', 'Usuario',
-  'MontoRecibido', 'Proveedor', 'RUT', 'EstadoDocumento'
+  'FechaEmisionDoc', 'FechaIngreso', 'NNotaRecepcion', 'Usuario',
+  'MontoRecibido', 'Proveedor', 'RUT', 'EstadoDocumento',
+  'EstadoAsociacion', 'Opciones', 'Impresion'
 ];
 
 async function login(page) {
@@ -59,7 +60,6 @@ async function login(page) {
 
 async function navigateToControlRecepcion(page) {
   console.log('Navegando a Control de Recepciones...');
-  console.log('URL:', CONTROL_RECEPCION_URL);
   await page.goto(CONTROL_RECEPCION_URL, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(5000);
 
@@ -73,23 +73,17 @@ async function navigateToControlRecepcion(page) {
 
   const frames = page.frames();
   console.log(`Frames encontrados: ${frames.length}`);
-  for (let i = 0; i < frames.length; i++) {
-    try { console.log(`  Frame ${i}: ${frames[i].url()}`); } catch (e) {}
-  }
 
   let targetFrame = page;
 
   for (const frame of frames) {
     try {
-      const hasRutField = await frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').count();
-      const hasBtn = await frame.locator('#btnBuscar, [name="btnBuscar"], input[value="Buscar"]').count();
-      const hasTable = await frame.locator('#tblDetalle, table[id*="detalle"], table[id*="Detalle"]').count();
-      const hasAnyInput = await frame.locator('input[type="text"]').count();
-
-      console.log(`  Frame check ${frame.url().substring(0, 80)}: Rut=${hasRutField}, Btn=${hasBtn}, Table=${hasTable}, Inputs=${hasAnyInput}`);
+      const hasRutField = await frame.locator('#txtRutProveedor').count();
+      const hasBtn = await frame.locator('#btnBuscar').count();
+      const hasTable = await frame.locator('#tblDetalle').count();
 
       if (hasRutField > 0 || hasBtn > 0 || hasTable > 0) {
-        console.log(`  -> Frame seleccionado!`);
+        console.log('Frame con formulario encontrado');
         targetFrame = frame;
         break;
       }
@@ -99,148 +93,74 @@ async function navigateToControlRecepcion(page) {
   return targetFrame;
 }
 
-async function debugFormElements(frame, page) {
-  console.log('\n=== DEBUG: Elementos del formulario ===');
-
-  // Get ALL form elements with their details
-  const elements = await frame.evaluate(() => {
-    const result = [];
-    // Inputs
-    document.querySelectorAll('input').forEach(el => {
-      result.push({
-        tag: 'input',
-        type: el.type || '',
-        id: el.id || '',
-        name: el.name || '',
-        value: el.value || '',
-        placeholder: el.placeholder || '',
-        visible: el.offsetParent !== null
-      });
-    });
-    // Selects
-    document.querySelectorAll('select').forEach(el => {
-      const options = [];
-      el.querySelectorAll('option').forEach(opt => {
-        options.push({ value: opt.value, text: opt.text, selected: opt.selected });
-      });
-      result.push({
-        tag: 'select',
-        id: el.id || '',
-        name: el.name || '',
-        selectedValue: el.value,
-        options: options.slice(0, 10),
-        visible: el.offsetParent !== null
-      });
-    });
-    // Tables
-    document.querySelectorAll('table').forEach(el => {
-      const rows = el.querySelectorAll('tr');
-      result.push({
-        tag: 'table',
-        id: el.id || '',
-        className: el.className || '',
-        rows: rows.length,
-        visible: el.offsetParent !== null
-      });
-    });
-    return result;
-  });
-
-  elements.forEach(el => {
-    if (el.tag === 'input') {
-      console.log(`  <input type="${el.type}" id="${el.id}" name="${el.name}" value="${el.value}" placeholder="${el.placeholder}" visible=${el.visible}>`);
-    } else if (el.tag === 'select') {
-      console.log(`  <select id="${el.id}" name="${el.name}" selected="${el.selectedValue}" visible=${el.visible}>`);
-      el.options.forEach(opt => {
-        console.log(`    <option value="${opt.value}" ${opt.selected ? 'SELECTED' : ''}>${opt.text}</option>`);
-      });
-    } else if (el.tag === 'table') {
-      console.log(`  <table id="${el.id}" class="${el.className}" rows=${el.rows} visible=${el.visible}>`);
-    }
-  });
-
-  // Take screenshot of form
-  await page.screenshot({ path: path.join(__dirname, 'data', 'debug_form.png'), fullPage: true });
-  console.log('=== FIN DEBUG ===\n');
-
-  return elements;
-}
-
 async function setFilters(frame, page) {
   console.log('Configurando filtros...');
 
-  // Debug: log all form elements first
-  const elements = await debugFormElements(frame, page);
-
-  // Set Centro de GestiÃ³n OC to "Todos"
+  // Set date range: from 01-01-2025 to today
+  // Real field IDs: ctrRangoIngresoFECHADESDE, ctrRangoIngresoFECHAHASTA
   try {
-    const selectOC = frame.locator('select[id*="CentroGestion"], select[name*="ddlCentroGestion"]').first();
-    if (await selectOC.count() > 0) {
-      await selectOC.selectOption({ index: 0 });
-      console.log('  Centro de GestiÃ³n configurado');
+    const fechaDesde = frame.locator('#ctrRangoIngresoFECHADESDE');
+    if (await fechaDesde.count() > 0) {
+      const currentValue = await fechaDesde.inputValue();
+      console.log(`  Fecha Desde actual: ${currentValue}`);
+      await fechaDesde.fill('');
+      await fechaDesde.fill('01-01-2025');
+      const newValue = await fechaDesde.inputValue();
+      console.log(`  Fecha Desde nueva: ${newValue}`);
     } else {
-      console.log('  Centro de GestiÃ³n select NO encontrado');
+      console.log('  Campo ctrRangoIngresoFECHADESDE no encontrado');
     }
   } catch (e) {
-    console.log('  Error configurando Centro de GestiÃ³n:', e.message);
+    console.log('  Error configurando fecha desde:', e.message);
   }
 
-  // Try multiple strategies for date fields
-  console.log('Buscando campos de fecha...');
-
-  // Strategy 1: Look for any input with date-like ids
-  const dateSelectors = [
-    'input[id*="fecha"]', 'input[id*="Fecha"]',
-    'input[id*="date"]', 'input[id*="Date"]',
-    'input[id*="fDesde"]', 'input[id*="fHasta"]',
-    'input[id*="desde"]', 'input[id*="hasta"]',
-    'input[id*="Desde"]', 'input[id*="Hasta"]',
-    'input[id*="Inicio"]', 'input[id*="Fin"]',
-    'input[id*="inicio"]', 'input[id*="fin"]',
-    'input[name*="fecha"]', 'input[name*="Fecha"]',
-    'input[name*="date"]', 'input[name*="Date"]',
-    'input[name*="Desde"]', 'input[name*="Hasta"]'
-  ];
-
-  for (const sel of dateSelectors) {
-    const count = await frame.locator(sel).count();
-    if (count > 0) {
-      console.log(`  Encontrado campo fecha con selector "${sel}" (${count} elementos)`);
-      try {
-        const field = frame.locator(sel).first();
-        const fieldId = await field.getAttribute('id');
-        const fieldName = await field.getAttribute('name');
-        const fieldValue = await field.inputValue();
-        console.log(`    id="${fieldId}" name="${fieldName}" valor actual="${fieldValue}"`);
-        // Try to set it
-        await field.fill('');
-        await field.fill('01-01-2025');
-        const newValue = await field.inputValue();
-        console.log(`    Nuevo valor="${newValue}"`);
-      } catch (e) {
-        console.log(`    Error al llenar: ${e.message}`);
-      }
+  try {
+    const fechaHasta = frame.locator('#ctrRangoIngresoFECHAHASTA');
+    if (await fechaHasta.count() > 0) {
+      const currentValue = await fechaHasta.inputValue();
+      console.log(`  Fecha Hasta actual: ${currentValue}`);
+      // Keep default (today's date) - no need to change
     }
+  } catch (e) {
+    console.log('  Error leyendo fecha hasta:', e.message);
   }
 
-  // Strategy 2: Check for text inputs that currently contain date-like values
-  const textInputs = await frame.locator('input[type="text"]').all();
-  console.log(`\n  Revisando ${textInputs.length} inputs de texto por valores de fecha...`);
-  for (let i = 0; i < textInputs.length; i++) {
-    try {
-      const id = await textInputs[i].getAttribute('id') || '';
-      const name = await textInputs[i].getAttribute('name') || '';
-      const value = await textInputs[i].inputValue();
-      if (value && (value.match(/\d{2}[-\/]\d{2}[-\/]\d{4}/) || value.match(/\d{4}[-\/]\d{2}[-\/]\d{2}/))) {
-        console.log(`    FECHA encontrada! input[${i}] id="${id}" name="${name}" value="${value}"`);
-      } else if (id || name) {
-        console.log(`    input[${i}] id="${id}" name="${name}" value="${value}"`);
-      }
-    } catch (e) {}
+  // Set Centro de GestiÃ³n Recibe to first option (all)
+  try {
+    const selectCG = frame.locator('#lstCentroGestionRecibe');
+    if (await selectCG.count() > 0) {
+      // Don't change - keep default selection
+      const val = await selectCG.inputValue();
+      console.log(`  Centro GestiÃ³n Recibe: ${val}`);
+    }
+  } catch (e) {
+    console.log('  Error leyendo Centro GestiÃ³n:', e.message);
   }
 
-  // Take screenshot after filters
-  await page.screenshot({ path: path.join(__dirname, 'data', 'debug_after_filters.png'), fullPage: true });
+  // Set Estado Ingreso to "Todos" (-1)
+  try {
+    const selectEstado = frame.locator('#lstEstadoIngreso');
+    if (await selectEstado.count() > 0) {
+      await selectEstado.selectOption('-1');
+      console.log('  Estado Ingreso: Todos');
+    }
+  } catch (e) {
+    console.log('  Error configurando Estado Ingreso:', e.message);
+  }
+
+  // Set Tipo Nota to "Todos" (-1)
+  try {
+    const selectTipo = frame.locator('#lstTipoNota');
+    if (await selectTipo.count() > 0) {
+      await selectTipo.selectOption('-1');
+      console.log('  Tipo Nota: Todos');
+    }
+  } catch (e) {
+    console.log('  Error configurando Tipo Nota:', e.message);
+  }
+
+  // Take screenshot of configured form
+  await page.screenshot({ path: path.join(__dirname, 'data', 'debug_form.png'), fullPage: true });
 
   await frame.waitForTimeout(1000);
 }
@@ -253,10 +173,12 @@ async function extractTableData(frame) {
     const rows = table.querySelectorAll('tr');
     const data = [];
 
+    // Skip header row (i=0), extract data rows
     for (let i = 1; i < rows.length; i++) {
       const cells = rows[i].querySelectorAll('td');
       const row = [];
       cells.forEach(c => row.push(c.innerText.trim()));
+      // Table has 15 columns, we want first 12 (skip Opciones, Impresion, etc)
       if (row.length >= 12) data.push(row.slice(0, 12));
     }
     return data;
@@ -269,15 +191,6 @@ async function getPageCount(frame) {
     let maxPage = 1;
     links.forEach(link => {
       const match = link.href.match(/IrA.*?(\d+)/);
-      if (match) {
-        const num = parseInt(match[1]);
-        if (num > maxPage) maxPage = num;
-      }
-    });
-
-    const onclickLinks = document.querySelectorAll('a[onclick*="IrA"]');
-    onclickLinks.forEach(link => {
-      const match = link.getAttribute('onclick').match(/IrA\((\d+)\)/);
       if (match) {
         const num = parseInt(match[1]);
         if (num > maxPage) maxPage = num;
@@ -309,17 +222,17 @@ async function navigateToPage(frame, pageNum) {
   }
 }
 
-async function searchByRut(frame, rut) {
+async function searchByRut(frame, rut, page) {
   console.log(`Buscando RUT: ${rut}...`);
 
-  const rutField = frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]').first();
+  const rutField = frame.locator('#txtRutProveedor');
   await rutField.waitFor({ state: 'visible', timeout: 30000 });
   await rutField.fill('');
   await rutField.fill(rut);
   await frame.waitForTimeout(500);
 
   try {
-    const btnBuscar = frame.locator('#btnBuscar, [name="btnBuscar"], input[value="Buscar"], button:has-text("Buscar")').first();
+    const btnBuscar = frame.locator('#btnBuscar');
     if (await btnBuscar.count() > 0) {
       await btnBuscar.click();
       console.log('  BotÃ³n Buscar clickeado');
@@ -342,57 +255,30 @@ async function searchByRut(frame, rut) {
     await frame.waitForTimeout(10000);
   }
 
-  // Debug: log table HTML structure
+  // Log table info for debugging
   const tableInfo = await frame.evaluate(() => {
     const table = document.getElementById('tblDetalle');
     if (!table) return { found: false };
     const rows = table.querySelectorAll('tr');
-    const headerCells = rows[0] ? Array.from(rows[0].querySelectorAll('th, td')).map(c => c.innerText.trim()) : [];
-    const firstRowCells = rows[1] ? Array.from(rows[1].querySelectorAll('td')).map(c => c.innerText.trim()) : [];
     return {
       found: true,
       totalRows: rows.length,
-      headers: headerCells,
-      firstRow: firstRowCells,
-      outerHTML: table.outerHTML.substring(0, 2000)
+      dataRows: rows.length - 1
     };
   });
 
-  console.log(`  Tabla info: ${JSON.stringify({
-    found: tableInfo.found,
-    rows: tableInfo.totalRows,
-    headers: tableInfo.headers,
-    firstRow: tableInfo.firstRow
-  }, null, 0)}`);
+  console.log(`  Tabla: ${tableInfo.dataRows} filas de datos`);
 
-  if (tableInfo.totalRows <= 1) {
-    // Also log any message on the page that says "no results"
-    const noResults = await frame.evaluate(() => {
-      const body = document.body.innerText;
-      const lines = body.split('\n').filter(l => l.trim());
-      return lines.filter(l =>
-        l.toLowerCase().includes('no hay') ||
-        l.toLowerCase().includes('sin resultado') ||
-        l.toLowerCase().includes('no se encontr') ||
-        l.toLowerCase().includes('0 registro')
-      );
-    });
-    if (noResults.length > 0) {
-      console.log(`  Mensajes de sin resultados: ${JSON.stringify(noResults)}`);
-    }
-  }
+  // Take screenshot after search
+  await page.screenshot({ path: path.join(__dirname, 'data', `debug_search_${rut.replace('-', '')}.png`), fullPage: true });
 }
 
-async function scrapeAllPages(frame, rutInfo) {
-  await searchByRut(frame, rutInfo.rut);
+async function scrapeAllPages(frame, rutInfo, page) {
+  await searchByRut(frame, rutInfo.rut, page);
 
   let allData = [];
   const totalPages = await getPageCount(frame);
   console.log(`  Total de pÃ¡ginas: ${totalPages}`);
-
-  if (totalPages > 1) {
-    await navigateToPage(frame, 1);
-  }
 
   for (let p = 1; p <= totalPages; p++) {
     if (p > 1) {
@@ -432,7 +318,7 @@ async function main() {
 
     let hasForm = false;
     try {
-      const rutField = frame.locator('input[id*="RutProveedor"], input[id*="txtRut"], input[name*="Rut"]');
+      const rutField = frame.locator('#txtRutProveedor');
       hasForm = (await rutField.count()) > 0;
     } catch (e) {}
 
@@ -448,7 +334,7 @@ async function main() {
     const allResults = {};
 
     for (const rutInfo of RUTS) {
-      const data = await scrapeAllPages(frame, rutInfo);
+      const data = await scrapeAllPages(frame, rutInfo, page);
       allResults[rutInfo.rut] = {
         name: rutInfo.name,
         rows: data
