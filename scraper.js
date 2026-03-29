@@ -105,18 +105,6 @@ async function selectProvider(frame, page, rutInfo) {
     console.log('  Dialog aceptado');
   });
 
-  let lupaClicked = false;
-  const lupaSelectors = ['img[src*="lupa"]','img[src*="search"]','img[src*="buscar"]','a[href*="proveedores"]','input[type="image"][src*="lupa"]','input[type="image"][src*="search"]','#imgBuscarProveedor','#btnBuscarProveedor','#lnkBuscarProveedor','img[onclicUT -> search -> select "Proveedores No integrados" tab -> click select -> accept dialog
-async function selectProvider(frame, page, rutInfo) {
-  console.log(`Seleccionando proveedor: ${rutInfo.name} (${rutInfo.rut})...`);
-
-  // Set up dialog handler BEFORE triggering it - accept the "no integrado" confirmation
-  page.on('dialog', async (dialog) => {
-    console.log(`  Dialog detectado: "${dialog.message().substring(0, 80)}..."`);
-    await dialog.accept();
-    console.log('  Dialog aceptado');
-  });
-
   // Find and click the magnifying glass icon (lupa) next to RUT Proveedor
   // It could be an image button, a link, or a regular button near txtRutProveedor
   let lupaClicked = false;
