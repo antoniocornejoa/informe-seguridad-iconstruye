@@ -10,8 +10,8 @@ const USERNAME = process.env.ICONSTRUYE_USER;
 const PASSWORD = process.env.ICONSTRUYE_PASS;
 
 const RUTS = [
-  { rut: '76230752-9', name: 'VSM ASOCIADOS SPA' },
-  { rut: '77543490-2', name: 'Sociedad Guardias de Talca Ltda.' }
+  { rut: '76230752-9', rutSinDV: '76230752', name: 'VSM ASOCIADOS SPA' },
+  { rut: '77543490-2', rutSinDV: '77543490', name: 'Sociedad Guardias de Talca Ltda.' }
 ];
 
 const COLUMNS = [
@@ -93,11 +93,237 @@ async function navigateToControlRecepcion(page) {
   return targetFrame;
 }
 
+// NEW: Select provider via the popup search (lupa icon)
+// Flow: click lupa -> popup opens -> enter RUT -> search -> select "Proveedores No integrados" tab -> click select -> accept dialog
+async function selectProvider(frame, page, rutInfo) {
+  console.log(`Seleccionando proveedor: ${rutInfo.name} (${rutInfo.rut})...`);
+
+  // Set up dialog handler BEFORE triggering it - accept the "no integrado" confirmation
+  page.on('dialog', async (dialog) => {
+    console.log(`  Dialog detectado: "${dialog.message().substring(0, 80)}..."`);
+    await dialog.accept();
+    console.log('  Dialog aceptado');
+  });
+
+  let lupaClicked = false;
+  const lupaSelectors = ['img[src*="lupa"]','img[src*="search"]','img[src*="buscar"]','a[href*="proveedores"]','input[type="image"][src*="lupa"]','input[type="image"][src*="search"]','#imgBuscarProveedor','#btnBuscarProveedor','#lnkBuscarProveedor','img[onclicUT -> search -> select "Proveedores No integrados" tab -> click select -> accept dialog
+async function selectProvider(frame, page, rutInfo) {
+  console.log(`Seleccionando proveedor: ${rutInfo.name} (${rutInfo.rut})...`);
+
+  // Set up dialog handler BEFORE triggering it - accept the "no integrado" confirmation
+  page.on('dialog', async (dialog) => {
+    console.log(`  Dialog detectado: "${dialog.message().substring(0, 80)}..."`);
+    await dialog.accept();
+    console.log('  Dialog aceptado');
+  });
+
+  // Find and click the magnifying glass icon (lupa) next to RUT Proveedor
+  // It could be an image button, a link, or a regular button near txtRutProveedor
+  let lupaClicked = false;
+
+  // Try common selectors for the lupa/search icon
+  const lupaSelectors = [
+    'img[src*="lupa"]',
+    'img[src*="search"]',
+    'img[src*="buscar"]',
+    'a[href*="proveedores"]',
+    'input[type="image"][src*="lupa"]',
+    'input[type="image"][src*="search"]',
+    '#imgBuscarProveedor',
+    '#btnBuscarProveedor',
+    '#lnkBuscarProveedor',
+    'img[onclick*="proveedor"]',
+    'a[onclick*="proveedor"]',
+  ];
+
+  for (const selector of lupaSelectors) {
+    try {
+      const el = frame.locator(selector);
+      if (await el.count() > 0) {
+        console.log(`  Lupa encontrada con selector: ${selector}`);
+
+        // Listen for popup window
+        const [popup] = await Promise.all([
+          page.context().waitForEvent('page', { timeout: 10000 }),
+          el.first().click()
+        ]);
+
+        console.log('  Popup de proveedores abierto');
+        await popup.waitForLoadState('networkidle', { timeout: 30000 });
+        await popup.waitForTimeout(2000);
+
+        const popupUrl = popup.url();
+        console.log(`  Popup URL: ${popupUrl}`);
+
+        // Screenshot of the popup
+        await popup.screenshot({ path: path.join(__dirname, 'data', `debug_popup_${rutInfo.rutSinDV}.png`) });
+
+        // Enter the RUT (sin digito ni puntos) in the popup search field
+        // The popup has a field for RUT - try common IDs
+        const rutInputSelectors = ['#txtRut', '#txtRutBuscar', 'input[id*="Rut"]', 'input[id*="rut"]', 'input[type="text"]'];
+        let rutEntered = false;
+
+        for (const rutSel of rutInputSelectors) {
+          try {
+            const rutInput = popup.locator(rutSel).first();
+            if (await rutInput.count() > 0 && await rutInput.isVisible()) {
+              await rutInput.fill(rutInfo.rutSinDV);
+              console.log(`  RUT ingresado en popup: ${rutInfo.rutSinDV} (selector: ${rutSel})`);
+              rutEntered = true;
+              break;
+            }
+          } catch (e) {}
+        }
+
+        if (!rutEntered) {
+          console.log('  WARN: No se pudo ingresar RUT en popup, intentando con todos los inputs...');
+          const inputs = popup.locator('input[type="text"]');
+          const count = await inputs.count();
+          if (count > 0) {
+            await inputs.first().fill(rutInfo.rutSinDV);
+            console.log(`  RUT ingresado en primer input de texto`);
+          }
+        }
+
+        // Click "Buscar" button in popup
+        const buscarPopupSelectors = ['#btnBuscar', 'input[value="Buscar"]', 'button:has-text("Buscar")', 'input[type="submit"]', 'input[type="button"][value*="Buscar"]'];
+        for (const btnSel of buscarPopupSelectors) {
+          try {
+            const btn = popup.locator(btnSel).first();
+            if (await btn.count() > 0) {
+              await btn.click();
+              console.log(`  Buscar clickeado en popup (selector: ${btnSel})`);
+              break;
+            }
+          } catch (e) {}
+        }
+
+        await popup.waitForTimeout(3000);
+        await popup.screenshot({ path: path.join(__dirname, 'data', `debug_popup_results_${rutInfo.rutSinDV}.png`) });
+
+        // Click on "Proveedores No integrados" tab
+        try {
+          const noIntegradosTab = popup.locator('text=No integrados').first();
+          if (await noIntegradosTab.count() > 0) {
+            await noIntegradosTab.click();
+            console.log('  Tab "Proveedores No integrados" clickeado');
+            await popup.waitForTimeout(1000);
+          } else {
+            // Try alternative selectors
+            const tabLinks = popup.locator('a, td, span, div').filter({ hasText: 'No integrados' });
+            if (await tabLinks.count() > 0) {
+              await tabLinks.first().click();
+              console.log('  Tab "No integrados" clickeado (alt)');
+              await popup.waitForTimeout(1000);
+            }
+          }
+        } catch (e) {
+          console.log('  Tab No integrados no encontrado o ya seleccionado:', e.message);
+        }
+
+        await popup.screenshot({ path: path.join(__dirname, 'data', `debug_popup_nointegrados_${rutInfo.rutSinDV}.png`) });
+
+        // Click the select/pencil icon for the provider
+        // Look for a clickable element (image, link) in the results row
+        let selected = false;
+        const selectSelectors = [
+          'img[src*="seleccionar"]',
+          'img[src*="select"]',
+          'img[src*="lapiz"]',
+          'img[src*="pencil"]',
+          'img[src*="edit"]',
+          'a[href*="Seleccionar"]',
+          'a[title*="Seleccionar"]',
+          'img[alt*="Seleccionar"]',
+          'input[type="image"]',
+        ];
+
+        for (const selSel of selectSelectors) {
+          try {
+            const selBtn = popup.locator(selSel).first();
+            if (await selBtn.count() > 0) {
+              await selBtn.click();
+              console.log(`  Proveedor seleccionado (selector: ${selSel})`);
+              selected = true;
+              break;
+            }
+          } catch (e) {}
+        }
+
+        if (!selected) {
+          // Fallback: try clicking any image or link in the results table
+          try {
+            const imgs = popup.locator('table img, table a').first();
+            if (await imgs.count() > 0) {
+              await imgs.click();
+              console.log('  Proveedor seleccionado (fallback: first table img/link)');
+              selected = true;
+            }
+          } catch (e) {
+            console.log('  WARN: No se pudo seleccionar proveedor:', e.message);
+          }
+        }
+
+        // Wait for dialog and popup to close
+        await popup.waitForTimeout(3000);
+
+        // The popup should close after selection + dialog acceptance
+        try {
+          if (!popup.isClosed()) {
+            console.log('  Popup aÃºn abierto, esperando cierre...');
+            await popup.waitForEvent('close', { timeout: 10000 }).catch(() => {});
+          }
+        } catch (e) {}
+
+        console.log('  Proveedor seleccionado correctamente');
+        lupaClicked = true;
+        break;
+      }
+    } catch (e) {
+      console.log(`  Selector ${selector} fallÃ³: ${e.message.substring(0, 80)}`);
+    }
+  }
+
+  if (!lupaClicked) {
+    // Fallback: try to find ANY clickable element near txtRutProveedor that opens a popup
+    console.log('  Intentando encontrar lupa por proximidad...');
+    try {
+      // Debug: list all images and links on the form
+      const allImages = await frame.evaluate(() => {
+        const imgs = document.querySelectorAll('img, input[type="image"]');
+        return Array.from(imgs).map(img => ({
+          src: img.src || img.getAttribute('src'),
+          alt: img.alt,
+          id: img.id,
+          onclick: img.getAttribute('onclick'),
+          parentId: img.parentElement?.id
+        }));
+      });
+      console.log('  ImÃ¡genes encontradas:', JSON.stringify(allImages.slice(0, 10)));
+    } catch (e) {
+      console.log('  Error listando imÃ¡genes:', e.message);
+    }
+  }
+
+  // Wait for the main page to update after provider selection
+  await frame.waitForTimeout(2000);
+
+  // Verify the RUT field was populated
+  try {
+    const rutValue = await frame.locator('#txtRutProveedor').inputValue();
+    console.log(`  RUT en campo despuÃ©s de selecciÃ³n: "${rutValue}"`);
+  } catch (e) {
+    console.log('  No se pudo leer campo RUT:', e.message);
+  }
+
+  // Take screenshot after provider selection
+  await page.screenshot({ path: path.join(__dirname, 'data', `debug_after_select_${rutInfo.rutSinDV}.png`), fullPage: true });
+}
+
 async function setFilters(frame, page) {
   console.log('Configurando filtros...');
 
   // Set date range: from 01-01-2025 to today
-  // Real field IDs: ctrRangoIngresoFECHADESDE, ctrRangoIngresoFECHAHASTA
   try {
     const fechaDesde = frame.locator('#ctrRangoIngresoFECHADESDE');
     if (await fechaDesde.count() > 0) {
@@ -119,22 +345,9 @@ async function setFilters(frame, page) {
     if (await fechaHasta.count() > 0) {
       const currentValue = await fechaHasta.inputValue();
       console.log(`  Fecha Hasta actual: ${currentValue}`);
-      // Keep default (today's date) - no need to change
     }
   } catch (e) {
     console.log('  Error leyendo fecha hasta:', e.message);
-  }
-
-  // Set Centro de GestiÃ³n Recibe to first option (all)
-  try {
-    const selectCG = frame.locator('#lstCentroGestionRecibe');
-    if (await selectCG.count() > 0) {
-      // Don't change - keep default selection
-      const val = await selectCG.inputValue();
-      console.log(`  Centro GestiÃ³n Recibe: ${val}`);
-    }
-  } catch (e) {
-    console.log('  Error leyendo Centro GestiÃ³n:', e.message);
   }
 
   // Set Estado Ingreso to "Todos" (-1)
@@ -159,9 +372,7 @@ async function setFilters(frame, page) {
     console.log('  Error configurando Tipo Nota:', e.message);
   }
 
-  // Take screenshot of configured form
   await page.screenshot({ path: path.join(__dirname, 'data', 'debug_form.png'), fullPage: true });
-
   await frame.waitForTimeout(1000);
 }
 
@@ -173,12 +384,10 @@ async function extractTableData(frame) {
     const rows = table.querySelectorAll('tr');
     const data = [];
 
-    // Skip header row (i=0), extract data rows
     for (let i = 1; i < rows.length; i++) {
       const cells = rows[i].querySelectorAll('td');
       const row = [];
       cells.forEach(c => row.push(c.innerText.trim()));
-      // Table has 15 columns, we want first 12 (skip Opciones, Impresion, etc)
       if (row.length >= 12) data.push(row.slice(0, 12));
     }
     return data;
@@ -222,15 +431,8 @@ async function navigateToPage(frame, pageNum) {
   }
 }
 
-async function searchByRut(frame, rut, page) {
-  console.log(`Buscando RUT: ${rut}...`);
-
-  const rutField = frame.locator('#txtRutProveedor');
-  await rutField.waitFor({ state: 'visible', timeout: 30000 });
-  await rutField.fill('');
-  await rutField.fill(rut);
-  await frame.waitForTimeout(500);
-
+async function clickBuscar(frame, page) {
+  console.log('  Clickeando Buscar...');
   try {
     const btnBuscar = frame.locator('#btnBuscar');
     if (await btnBuscar.count() > 0) {
@@ -254,8 +456,21 @@ async function searchByRut(frame, rut, page) {
     console.log('  Tabla no encontrada, esperando mÃ¡s...');
     await frame.waitForTimeout(10000);
   }
+}
 
-  // Log table info for debugging
+async function scrapeRut(frame, page, rutInfo) {
+  console.log(`\n=== Procesando ${rutInfo.name} (${rutInfo.rut}) ===`);
+
+  // Step 1: Select provider via popup FIRST (before filters)
+  await selectProvider(frame, page, rutInfo);
+
+  // Step 2: Set filters AFTER provider selection
+  await setFilters(frame, page);
+
+  // Step 3: Click Buscar
+  await clickBuscar(frame, page);
+
+  // Log table info
   const tableInfo = await frame.evaluate(() => {
     const table = document.getElementById('tblDetalle');
     if (!table) return { found: false };
@@ -268,14 +483,9 @@ async function searchByRut(frame, rut, page) {
   });
 
   console.log(`  Tabla: ${tableInfo.dataRows} filas de datos`);
+  await page.screenshot({ path: path.join(__dirname, 'data', `debug_search_${rutInfo.rutSinDV}.png`), fullPage: true });
 
-  // Take screenshot after search
-  await page.screenshot({ path: path.join(__dirname, 'data', `debug_search_${rut.replace('-', '')}.png`), fullPage: true });
-}
-
-async function scrapeAllPages(frame, rutInfo, page) {
-  await searchByRut(frame, rutInfo.rut, page);
-
+  // Extract all pages
   let allData = [];
   const totalPages = await getPageCount(frame);
   console.log(`  Total de pÃ¡ginas: ${totalPages}`);
@@ -329,12 +539,28 @@ async function main() {
     }
 
     console.log('Formulario de Control de RecepciÃ³n encontrado!');
-    await setFilters(frame, page);
 
     const allResults = {};
 
     for (const rutInfo of RUTS) {
-      const data = await scrapeAllPages(frame, rutInfo, page);
+      // Navigate fresh to the page for each RUT to avoid stale state
+      if (RUTS.indexOf(rutInfo) > 0) {
+        await page.goto(CONTROL_RECEPCION_URL, { waitUntil: 'networkidle', timeout: 60000 });
+        await page.waitForTimeout(3000);
+      }
+
+      // Re-find the frame for each RUT
+      let currentFrame = page;
+      for (const f of page.frames()) {
+        try {
+          if (await f.locator('#txtRutProveedor').count() > 0) {
+            currentFrame = f;
+            break;
+          }
+        } catch (e) {}
+      }
+
+      const data = await scrapeRut(currentFrame, page, rutInfo);
       allResults[rutInfo.rut] = {
         name: rutInfo.name,
         rows: data
