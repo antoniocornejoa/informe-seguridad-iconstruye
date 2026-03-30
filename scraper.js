@@ -99,6 +99,8 @@ async function selectProvider(frame, page, rutInfo) {
   console.log(`Seleccionando proveedor: ${rutInfo.name} (${rutInfo.rut})...`);
 
   // Set up dialog handler BEFORE triggering it - accept the "no integrado" confirmation
+  // Remove any existing dialog handlers to avoid stacking
+  page.removeAllListeners('dialog');
   page.on('dialog', async (dialog) => {
     console.log(`  Dialog detectado: "${dialog.message().substring(0, 80)}..."`);
     await dialog.accept();
@@ -155,8 +157,8 @@ async function selectProvider(frame, page, rutInfo) {
           try {
             const rutInput = popup.locator(rutSel).first();
             if (await rutInput.count() > 0 && await rutInput.isVisible()) {
-              await rutInput.fill(rutInfo.rutSinDV);
-              console.log(`  RUT ingresado en popup: ${rutInfo.rutSinDV} (selector: ${rutSel})`);
+              await rutInput.fill(rutInfo.rut);
+              console.log(`  RUT ingresado en popup: ${rutInfo.rut} (selector: ${rutSel})`);
               rutEntered = true;
               break;
             }
@@ -168,7 +170,7 @@ async function selectProvider(frame, page, rutInfo) {
           const inputs = popup.locator('input[type="text"]');
           const count = await inputs.count();
           if (count > 0) {
-            await inputs.first().fill(rutInfo.rutSinDV);
+            await inputs.first().fill(rutInfo.rut);
             console.log(`  RUT ingresado en primer input de texto`);
           }
         }
@@ -310,6 +312,50 @@ async function selectProvider(frame, page, rutInfo) {
 
 async function setFilters(frame, page) {
   console.log('Configurando filtros...');
+
+  // First: Set Centro de GestiÃ³n OC to "Todos" (last option in dropdown)
+  try {
+    // Find all select elements and log them for debugging
+    const selectInfo = await frame.evaluate(() => {
+      const selects = document.querySelectorAll('select');
+      return Array.from(selects).map(s => ({
+        id: s.id,
+        name: s.name,
+        optionCount: s.options.length,
+        firstOption: s.options[0]?.text,
+        lastOption: s.options[s.options.length - 1]?.text,
+        lastOptionValue: s.options[s.options.length - 1]?.value,
+        selectedText: s.options[s.selectedIndex]?.text
+      }));
+    });
+    console.log('  Dropdowns encontrados:', JSON.stringify(selectInfo, null, 2));
+
+    // Set Centro de GestiÃ³n OC to "Todos"
+    for (const sel of selectInfo) {
+      if (sel.id && (sel.id.toLowerCase().includes('centrogestion') || sel.id.toLowerCase().includes('centro'))) {
+        const selectEl = frame.locator(`#${sel.id}`);
+        if (await selectEl.count() > 0) {
+          // Select "Todos" - try the last option value first (usually "Todos" is at the end)
+          try {
+            await selectEl.selectOption({ label: 'Todos' });
+            console.log(`  ${sel.id}: Seleccionado "Todos" por label`);
+          } catch (e) {
+            // Try selecting by value - "Todos" might have value "" or "-1" or "0"
+            try {
+              await selectEl.selectOption(sel.lastOptionValue);
+              console.log(`  ${sel.id}: Seleccionado Ãºltimo valor "${sel.lastOptionValue}" (${sel.lastOption})`);
+            } catch (e2) {
+              console.log(`  ${sel.id}: No se pudo seleccionar Todos: ${e2.message}`);
+            }
+          }
+          // Wait for postback that may occur on dropdown change
+          await frame.waitForTimeout(2000);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('  Error configurando Centro de GestiÃ³n:', e.message);
+  }
 
   // Set date range: from 01-01-2025 to today
   try {
