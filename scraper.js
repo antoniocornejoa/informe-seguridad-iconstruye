@@ -429,40 +429,122 @@ async function extractTableData(frame) {
 }
 
 async function getPageCount(frame) {
-  return await frame.evaluate(() => {
-    const links = document.querySelectorAll('a[href*="IrA"]');
-    let maxPage = 1;
-    links.forEach(link => {
-      const match = link.href.match(/IrA.*?(\d+)/);
-      if (match) {
-        const num = parseInt(match[1]);
-        if (num > maxPage) maxPage = num;
-      }
-    });
-
+  const pageInfo = await frame.evaluate(() => {
+    // Find all links that look like pagination
     const allLinks = document.querySelectorAll('a[href*="__doPostBack"]');
-    allLinks.forEach(link => {
-      const match = link.href.match(/IrA.*?(\d+)/);
-      if (match) {
-        const num = parseInt(match[1]);
-        if (num > maxPage) maxPage = num;
+    let maxPage = 1;
+    const paginationLinks = [];
+
+    for (const link of allLinks) {
+      const href = link.href || '';
+      const text = link.textContent.trim();
+      const num = parseInt(text);
+
+      // Check if this is a numeric page link
+      if (!isNaN(num) && num > 0 && num <= 200) {
+        // Extract __doPostBack parameters
+        const match = href.match(/__doPostBack\('([^']+)'\s*,\s*'([^']*)'\)/);
+        if (match) {
+          paginationLinks.push({
+            pageNum: num,
+            text,
+            eventTarget: match[1],
+            eventArg: match[2]
+          });
+          if (num > maxPage) maxPage = num;
+        }
       }
-    });
-    return maxPage;
+    }
+
+    return { maxPage, paginationLinks };
   });
+
+  console.log(`  Pagination info: maxPage=${pageInfo.maxPage}, links found=${pageInfo.paginationLinks.length}`);
+  if (pageInfo.paginationLinks.length > 0) {
+    console.log(`  Sample pagination links:`, JSON.stringify(pageInfo.paginationLinks.slice(0, 3)));
+  }
+
+  return pageInfo;
 }
 
-async function navigateToPage(frame, pageNum) {
-  await frame.evaluate((num) => {
-    __doPostBack('IrA', num.toString());
-  }, pageNum);
-  await frame.waitForTimeout(3000);
+async function navigateToPage(frame, pageNum, pageInfo) {
+  // Find the exact postback parameters for this page from the detected links
+  const linkInfo = pageInfo.paginationLinks.find(l => l.pageNum === pageNum);
+
+  // Capture current ViewState to detect when postback completes
+  const viewStateBefore = await frame.evaluate(() => {
+    const vs = document.getElementById('__VIEWSTATE');
+    return vs ? vs.value.substring(0, 30) : '';
+  });
+
+  if (linkInfo) {
+    console.log(`  Navigating to page ${pageNum}: __doPostBack('${linkInfo.eventTarget}', '${linkInfo.eventArg}')`);
+    // Trigger the postback with the correct parameters parsed from the actual link
+    await frame.evaluate(({ target, arg }) => {
+      __doPostBack(target, arg);
+    }, { target: linkInfo.eventTarget, arg: linkInfo.eventArg });
+  } else {
+    // Fallback: try clicking the link element directly by matching text
+    console.log(`  No parsed link for page ${pageNum}, trying click by text...`);
+    let clicked = false;
+    try {
+      // Find links that contain just the page number as text
+      const linkCount = await frame.locator('a[href*="__doPostBack"]').count();
+      for (let i = 0; i < linkCount; i++) {
+        const link = frame.locator('a[href*="__doPostBack"]').nth(i);
+        const text = await link.textContent();
+        if (text && text.trim() === pageNum.toString()) {
+          await link.click();
+          clicked = true;
+          console.log(`  Clicked pagination link with text "${pageNum}"`);
+          break;
+        }
+      }
+    } catch (e) {
+      console.log(`  Link click error: ${e.message.substring(0, 80)}`);
+    }
+
+    if (!clicked) {
+      console.log(`  Last resort: __doPostBack('IrA', '${pageNum}')`);
+      await frame.evaluate((num) => {
+        __doPostBack('IrA', num.toString());
+      }, pageNum);
+    }
+  }
+
+  // Wait for the postback to complete by checking if the ViewState changed
+  // This is the most reliable way to detect ASP.NET postback completion
+  try {
+    await frame.waitForFunction((oldVS) => {
+      const vs = document.getElementById('__VIEWSTATE');
+      if (!vs) return true; // If no ViewState, page might have changed entirely
+      return vs.value.substring(0, 30) !== oldVS;
+    }, viewStateBefore, { timeout: 30000 });
+    console.log(`  ViewState changed - postback completed for page ${pageNum}`);
+  } catch (e) {
+    console.log(`  ViewState wait timeout for page ${pageNum}, falling back to delay...`);
+    await frame.waitForTimeout(8000);
+  }
+
+  // Extra wait for table rendering
+  await frame.waitForTimeout(1500);
+
   try {
     await frame.waitForSelector('#tblDetalle', { timeout: 15000 });
   } catch (e) {
-    console.log(`Esperando tabla en pÃ¡gina ${pageNum}...`);
+    console.log(`  Tabla no encontrada en pÃ¡gina ${pageNum}, esperando mÃ¡s...`);
     await frame.waitForTimeout(5000);
   }
+
+  // Debug: verify what we got
+  const tableCheck = await frame.evaluate(() => {
+    const table = document.getElementById('tblDetalle');
+    if (!table) return { found: false, url: window.location.href.substring(0, 100) };
+    const rows = table.querySelectorAll('tr');
+    const firstRowText = rows.length > 1 ? rows[1].textContent.substring(0, 100) : '';
+    return { found: true, rowCount: rows.length - 1, firstRowPreview: firstRowText };
+  });
+  console.log(`  Table check page ${pageNum}:`, JSON.stringify(tableCheck));
 }
 
 async function clickBuscar(frame, page) {
@@ -521,16 +603,33 @@ async function scrapeRut(frame, page, rutInfo) {
 
   // Extract all pages
   let allData = [];
-  const totalPages = await getPageCount(frame);
-  console.log(`  Total de pÃ¡ginas: ${totalPages}`);
+  const pageInfo = await getPageCount(frame);
+  console.log(`  Total de pÃ¡ginas: ${pageInfo.maxPage}`);
 
-  for (let p = 1; p <= totalPages; p++) {
+  for (let p = 1; p <= pageInfo.maxPage; p++) {
     if (p > 1) {
-      await navigateToPage(frame, p);
+      await navigateToPage(frame, p, pageInfo);
     }
     const pageData = await extractTableData(frame);
     console.log(`  PÃ¡gina ${p}: ${pageData.length} filas`);
     allData = allData.concat(pageData);
+
+    // If after navigation we get 0 rows and we're past page 1, the pagination may not be working
+    // Try re-fetching page info in case the links changed after navigation
+    if (p > 1 && pageData.length === 0) {
+      console.log(`  WARNING: 0 rows on page ${p}, checking if frame is still valid...`);
+      const recheck = await frame.evaluate(() => {
+        const table = document.getElementById('tblDetalle');
+        const form = document.getElementById('form1') || document.forms[0];
+        return {
+          hasTable: !!table,
+          hasForm: !!form,
+          url: window.location.href.substring(0, 120),
+          bodyLen: document.body?.innerHTML?.length || 0
+        };
+      }).catch(e => ({ error: e.message }));
+      console.log(`  Frame recheck:`, JSON.stringify(recheck));
+    }
   }
 
   console.log(`  Total ${rutInfo.name}: ${allData.length} filas`);
