@@ -3,6 +3,34 @@
     "name": "VSM ASOCIADOS SPA",
     "rows": [
       [
+        "859",
+        "Factura",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "18-04-2026",
+        "18-04-2026",
+        "NROC-25OTAOP12571",
+        "Rodolfo Segundo Reyes Fuenzalida",
+        "$1050000,00",
+        "JOSE ALFREDO DE LA HOZ BAHAMONDES",
+        "12788572-9",
+        "Ingresado"
+      ],
+      [
+        "860",
+        "Factura",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "18-04-2026",
+        "18-04-2026",
+        "NROC-25OTAOP12570",
+        "Rodolfo Segundo Reyes Fuenzalida",
+        "$4140000,00",
+        "JOSE ALFREDO DE LA HOZ BAHAMONDES",
+        "12788572-9",
+        "Ingresado"
+      ],
+      [
         "376436",
         "Factura",
         "(COLB) OFICINA CENTRAL",
@@ -672,34 +700,6 @@
         "$1268344,00",
         "Comercializadora y distribuidora VGV SPA.",
         "76420074-8",
-        "Ingresado"
-      ],
-      [
-        "20775",
-        "Factura",
-        "(COLB) TALCA - CONDOMINIO HACIENDA ESMERALDA III-C 44 VIV",
-        "(COLB) TALCA - CONDOMINIO HACIENDA ESMERALDA III-C 44 VIV",
-        "17-04-2026",
-        "17-04-2026",
-        "NROC-25ITAHE31458",
-        "Yeila Alexandra Huichaqueo Fuentes",
-        "$204141,00",
-        "INDUSTRIA DE VIBRADOS INDEPENDENCIA LIMITADA",
-        "76476437-4",
-        "Ingresado"
-      ],
-      [
-        "734",
-        "Factura",
-        "(CRIO) SAN JAVIER - BRISAS DE LONCOMILLA 525 V",
-        "(CRIO) SAN JAVIER - BRISAS DE LONCOMILLA 525 V",
-        "17-04-2026",
-        "17-04-2026",
-        "NROC-25SSJBL17146",
-        "Juan Alejandro Gonzalez Torres",
-        "$3764200,00",
-        "CONSTRUTORA CELSO SPA.",
-        "76297784-2",
         "Ingresado"
       ]
     ]
@@ -708,6 +708,34 @@
     "name": "Sociedad Guardias de Talca Ltda.",
     "rows": [
       [
+        "859",
+        "Factura",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "18-04-2026",
+        "18-04-2026",
+        "NROC-25OTAOP12571",
+        "Rodolfo Segundo Reyes Fuenzalida",
+        "$1050000,00",
+        "JOSE ALFREDO DE LA HOZ BAHAMONDES",
+        "12788572-9",
+        "Ingresado"
+      ],
+      [
+        "860",
+        "Factura",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "18-04-2026",
+        "18-04-2026",
+        "NROC-25OTAOP12570",
+        "Rodolfo Segundo Reyes Fuenzalida",
+        "$4140000,00",
+        "JOSE ALFREDO DE LA HOZ BAHAMONDES",
+        "12788572-9",
+        "Ingresado"
+      ],
+      [
         "376436",
         "Factura",
         "(COLB) OFICINA CENTRAL",
@@ -1377,34 +1405,6 @@
         "$1268344,00",
         "Comercializadora y distribuidora VGV SPA.",
         "76420074-8",
-        "Ingresado"
-      ],
-      [
-        "20775",
-        "Factura",
-        "(COLB) TALCA - CONDOMINIO HACIENDA ESMERALDA III-C 44 VIV",
-        "(COLB) TALCA - CONDOMINIO HACIENDA ESMERALDA III-C 44 VIV",
-        "17-04-2026",
-        "17-04-2026",
-        "NROC-25ITAHE31458",
-        "Yeila Alexandra Huichaqueo Fuentes",
-        "$204141,00",
-        "INDUSTRIA DE VIBRADOS INDEPENDENCIA LIMITADA",
-        "76476437-4",
-        "Ingresado"
-      ],
-      [
-        "734",
-        "Factura",
-        "(CRIO) SAN JAVIER - BRISAS DE LONCOMILLA 525 V",
-        "(CRIO) SAN JAVIER - BRISAS DE LONCOMILLA 525 V",
-        "17-04-2026",
-        "17-04-2026",
-        "NROC-25SSJBL17146",
-        "Juan Alejandro Gonzalez Torres",
-        "$3764200,00",
-        "CONSTRUTORA CELSO SPA.",
-        "76297784-2",
         "Ingresado"
       ]
     ]
