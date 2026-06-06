@@ -18,6 +18,7 @@ targets:
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
         UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: "Se usa la cámara y el sensor LiDAR para escanear y cubicar el interior de la tolva."
         UIRequiredDeviceCapabilities:
           - arkit
@@ -28,4 +29,14 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
         IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        MARKETING_VERSION: "0.1.0"
         PRODUCT_BUNDLE_IDENTIFIER: cl.iconstruye.tolvascan
+        CODE_SIGN_STYLE: Automatic
+
+schemes:
+  TolvaScan:
+    build:
+      targets:
+        TolvaScan: all
+    archive:
+      config: Release
