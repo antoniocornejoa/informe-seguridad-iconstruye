@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TolvaScan">
+<title>TolvaScan · Cubicador de tolvas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --card2:#334155; --line:#475569;
+    --txt:#f1f5f9; --muted:#94a3b8; --accent:#38bdf8; --accent2:#0ea5e9; --ok:#4ade80;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--txt);
+    padding:env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px);
+    -webkit-text-size-adjust:100%;
+  }
+  header{text-align:center;padding:24px 0 8px}
+  header h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.5px}
+  header h1 span{color:var(--accent)}
+  header p{margin:6px 0 0;color:var(--muted);font-size:14px}
+  .card{background:var(--card);border-radius:18px;padding:18px;margin:14px 0;border:1px solid #ffffff10}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px;font-weight:600}
+  .field{margin-bottom:14px}
+  input[type=number]{
+    width:100%;font-size:22px;padding:14px;border-radius:12px;border:1px solid var(--line);
+    background:var(--card2);color:var(--txt);font-weight:600;
+  }
+  input:focus{outline:none;border-color:var(--accent)}
+  .seg{display:flex;gap:6px;background:var(--card2);padding:5px;border-radius:12px;margin-bottom:14px;flex-wrap:wrap}
+  .seg button{
+    flex:1;min-width:80px;border:none;background:transparent;color:var(--muted);
+    padding:11px 6px;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .seg button.on{background:var(--accent);color:#03263a}
+  select{
+    width:100%;font-size:17px;padding:13px;border-radius:12px;border:1px solid var(--line);
+    background:var(--card2);color:var(--txt);font-weight:600;
+  }
+  .row{display:flex;gap:12px}
+  .row .field{flex:1}
+  .hint{font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px;line-height:1.4}
+  .result{text-align:center;background:linear-gradient(160deg,#0ea5e9,#0369a1);border:none}
+  .result .big{font-size:46px;font-weight:800;letter-spacing:-1px;margin:4px 0}
+  .result .sub{font-size:20px;opacity:.92;font-weight:600}
+  .result .ton{font-size:16px;margin-top:10px;opacity:.95}
+  .result .lbl{font-size:13px;text-transform:uppercase;letter-spacing:1px;opacity:.8}
+  details{margin-top:8px}
+  summary{color:var(--accent);font-size:14px;font-weight:600;cursor:pointer}
+  .diagram{font-size:13px;color:var(--muted);line-height:1.6;margin-top:8px}
+  footer{text-align:center;color:var(--muted);font-size:12px;margin-top:18px;line-height:1.5}
+  .pill{display:inline-block;background:var(--card2);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tolva<span>Scan</span></h1>
+  <p>Cubicador de tolvas · ingresa medidas y obtén volumen</p>
+</header>
+
+<div class="card">
+  <label>Forma de la tolva</label>
+  <div class="seg" id="shapeSeg">
+    <button data-shape="frustum" class="on">Tronco pirámide</button>
+    <button data-shape="box">Caja</button>
+    <button data-shape="cyl">Cilindro</button>
+    <button data-shape="area">Área × alto</button>
+  </div>
+
+  <label>Unidad de medida</label>
+  <div class="seg" id="unitSeg">
+    <button data-unit="m" class="on">Metros</button>
+    <button data-unit="cm">Centímetros</button>
+  </div>
+
+  <div id="fields"></div>
+</div>
+
+<div class="card">
+  <label>Material (opcional, para calcular toneladas)</label>
+  <select id="material"></select>
+  <div class="field" id="densityWrap" style="margin-top:12px">
+    <label>Densidad (t/m³)</label>
+    <input type="number" id="density" inputmode="decimal" step="0.01" placeholder="ej: 1.6">
+  </div>
+  <div class="hint">El árido (ripio, gravilla, arena) suele pesar 1.4–1.8 t/m³. Ajusta según tu material.</div>
+</div>
+
+<div class="card result">
+  <div class="lbl">Volumen</div>
+  <div class="big" id="m3">— m³</div>
+  <div class="sub" id="liters">— L</div>
+  <div class="ton" id="tons"></div>
+</div>
+
+<div class="card">
+  <details>
+    <summary>¿Cómo medir bien?</summary>
+    <div class="diagram" id="howto"></div>
+  </details>
+</div>
+
+<footer>
+  Estimación referencial. Para máxima precisión con material irregular se requiere
+  la versión con LiDAR.
+  <br><span class="pill">Tip: «Compartir → Agregar a pantalla de inicio» para usarla como app</span>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const MATERIALS = [
+  {name:"— Sin material (solo volumen) —", d:null},
+  {name:"Ripio / gravilla", d:1.6},
+  {name:"Arena seca", d:1.5},
+  {name:"Arena húmeda", d:1.9},
+  {name:"Tierra / relleno", d:1.5},
+  {name:"Tierra húmeda", d:1.8},
+  {name:"Grava chancada", d:1.7},
+  {name:"Hormigón fresco", d:2.4},
+  {name:"Asfalto", d:2.3},
+  {name:"Agua", d:1.0},
+  {name:"Personalizado", d:0},
+];
+
+const SHAPES = {
+  frustum:{
+    label:"Tronco de pirámide (boca rectangular)",
+    fields:[
+      ["La","Largo boca superior"],["Aa","Ancho boca superior"],
+      ["Lb","Largo fondo"],["Ab","Ancho fondo"],
+      ["H","Altura (profundidad)"]
+    ],
+    calc:v=>{const A1=v.La*v.Aa, A2=v.Lb*v.Ab; return v.H/3*(A1+A2+Math.sqrt(A1*A2));},
+    howto:"Mide el rectángulo de arriba (boca), el rectángulo del fondo y la profundidad vertical. Es la forma típica de una tolva con paredes inclinadas."
+  },
+  box:{
+    label:"Caja rectangular",
+    fields:[["L","Largo"],["A","Ancho"],["H","Alto"]],
+    calc:v=>v.L*v.A*v.H,
+    howto:"Mide largo, ancho y alto interiores. Sirve para tolvas o cajas de paredes rectas."
+  },
+  cyl:{
+    label:"Cilindro",
+    fields:[["D","Diámetro"],["H","Altura"]],
+    calc:v=>Math.PI*Math.pow(v.D/2,2)*v.H,
+    howto:"Mide el diámetro interior y la altura. Para silos o estanques cilíndricos."
+  },
+  area:{
+    label:"Área × altura",
+    fields:[["S","Área de la base (en unidad²)"],["H","Altura"]],
+    calc:v=>v.S*v.H,
+    howto:"Si ya conoces el área de la base, ingrésala junto con la altura. El área debe estar en la misma unidad al cuadrado (m² o cm²)."
+  }
+};
+
+let state = {shape:"frustum", unit:"m", vals:{}};
+
+// --- UI build ---
+function buildMaterials(){
+  const sel=$("material");
+  MATERIALS.forEach((m,i)=>{const o=document.createElement("option");o.value=i;o.textContent=m.name;sel.appendChild(o);});
+  sel.value=0;
+  sel.onchange=()=>{
+    const m=MATERIALS[+sel.value];
+    if(m.d===null){ $("density").value=""; $("densityWrap").style.display="none"; }
+    else { $("densityWrap").style.display="block"; if(m.d>0) $("density").value=m.d; else $("density").value=""; }
+    compute();
+  };
+  $("densityWrap").style.display="none";
+}
+
+function buildFields(){
+  const shape=SHAPES[state.shape];
+  const wrap=$("fields"); wrap.innerHTML="";
+  const unit = state.unit==="m"?"m":"cm";
+  const rows=[];
+  shape.fields.forEach(([key,lbl])=>{
+    const f=document.createElement("div"); f.className="field";
+    const unitLbl = (state.shape==="area" && key==="S") ? (unit+"²") : unit;
+    f.innerHTML=`<label>${lbl} (${unitLbl})</label>
+      <input type="number" inputmode="decimal" step="any" id="in_${key}" placeholder="0">`;
+    wrap.appendChild(f);
+    f.querySelector("input").addEventListener("input",e=>{
+      state.vals[key]=parseFloat(e.target.value)||0; compute();
+    });
+  });
+  $("howto").textContent=shape.howto;
+}
+
+function setSeg(segId, key, val){
+  [...$(segId).children].forEach(b=>b.classList.toggle("on", b.dataset[key]===val));
+}
+
+function compute(){
+  const shape=SHAPES[state.shape];
+  const v={}; let ok=true;
+  shape.fields.forEach(([k])=>{ v[k]=state.vals[k]||0; if(v[k]<=0) ok=false; });
+
+  if(!ok){ $("m3").textContent="— m³"; $("liters").textContent="— L"; $("tons").textContent=""; return; }
+
+  let vol = shape.calc(v); // en unidad^3
+  // Convertir a m³
+  if(state.unit==="cm"){
+    if(state.shape==="area"){
+      // S en cm², H en cm -> cm³
+      vol = vol; // ya cm³ (S*H). area field uses cm², H cm
+    }
+    vol = vol / 1e6; // cm³ -> m³
+  }
+  // (en metros ya está en m³)
+
+  const liters = vol*1000;
+  $("m3").textContent = vol.toLocaleString("es-CL",{maximumFractionDigits:3})+" m³";
+  $("liters").textContent = liters.toLocaleString("es-CL",{maximumFractionDigits:0})+" L";
+
+  const d=parseFloat($("density").value);
+  if(d>0 && $("densityWrap").style.display!=="none"){
+    const tons=vol*d;
+    $("tons").textContent = "≈ "+tons.toLocaleString("es-CL",{maximumFractionDigits:2})+" toneladas  ("+d+" t/m³)";
+  } else { $("tons").textContent=""; }
+}
+
+// --- events ---
+$("shapeSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  state.shape=b.dataset.shape; state.vals={};
+  setSeg("shapeSeg","shape",state.shape);
+  buildFields(); compute();
+});
+$("unitSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  state.unit=b.dataset.unit;
+  setSeg("unitSeg","unit",state.unit);
+  buildFields(); compute();
+});
+
+buildMaterials();
+buildFields();
+compute();
+
+// Service worker para uso offline
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
