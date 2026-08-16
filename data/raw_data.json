@@ -3,6 +3,34 @@
     "name": "VSM ASOCIADOS SPA",
     "rows": [
       [
+        "1149882",
+        "Guía Electrónica",
+        "(CRIO) TALCA - BATALLA DE LIRCAY II ETAPA 1 296 VIV. (DS19)",
+        "(CRIO) TALCA - BATALLA DE LIRCAY II ETAPA 1 296 VIV. (DS19)",
+        "13-08-2026",
+        "15-08-2026",
+        "NROC-25CTABL23376",
+        "Catalina Andrea Duran Palma",
+        "$612060,00",
+        "MELON S.A.",
+        "76109779-2",
+        "Ingresado"
+      ],
+      [
+        "1149385",
+        "Guía Electrónica",
+        "(CRIO) TALCA - BATALLA DE LIRCAY II ETAPA 1 296 VIV. (DS19)",
+        "(CRIO) TALCA - BATALLA DE LIRCAY II ETAPA 1 296 VIV. (DS19)",
+        "13-08-2026",
+        "15-08-2026",
+        "NROC-25CTABL23375",
+        "Catalina Andrea Duran Palma",
+        "$612060,00",
+        "MELON S.A.",
+        "76109779-2",
+        "Ingresado"
+      ],
+      [
         "2755",
         "Guía Electrónica",
         "(CRIO) PENCAHUE - BRISAS DE PENCAHUE 199 V. (DS49)",
@@ -672,34 +700,6 @@
         "$69365,00",
         "OPTIMIZA CONSULTING SPA",
         "77095052-k",
-        "Ingresado"
-      ],
-      [
-        "4289",
-        "Factura",
-        "(INMS) OFICINA CENTRAL",
-        "(INMS) OFICINA CENTRAL",
-        "14-08-2026",
-        "14-08-2026",
-        "NROC-OFIINMS193",
-        "Consuelo Uribe Gallego",
-        "$438511,00",
-        "OPTIMIZA CONSULTING SPA",
-        "77095052-k",
-        "Ingresado"
-      ],
-      [
-        "6835",
-        "Factura",
-        "(CISPA) OFICINA MARKETING",
-        "(CISPA) OFICINA MARKETING",
-        "14-08-2026",
-        "14-08-2026",
-        "NROC-OMKINDS1616",
-        "Daniela Eva Moreno Martinez",
-        "$450000,00",
-        "KOKE GRAF SPA",
-        "76892285-3",
         "Ingresado"
       ]
     ]
@@ -708,6 +708,34 @@
     "name": "Sociedad Guardias de Talca Ltda.",
     "rows": [
       [
+        "1149882",
+        "Guía Electrónica",
+        "(CRIO) TALCA - BATALLA DE LIRCAY II ETAPA 1 296 VIV. (DS19)",
+        "(CRIO) TALCA - BATALLA DE LIRCAY II ETAPA 1 296 VIV. (DS19)",
+        "13-08-2026",
+        "15-08-2026",
+        "NROC-25CTABL23376",
+        "Catalina Andrea Duran Palma",
+        "$612060,00",
+        "MELON S.A.",
+        "76109779-2",
+        "Ingresado"
+      ],
+      [
+        "1149385",
+        "Guía Electrónica",
+        "(CRIO) TALCA - BATALLA DE LIRCAY II ETAPA 1 296 VIV. (DS19)",
+        "(CRIO) TALCA - BATALLA DE LIRCAY II ETAPA 1 296 VIV. (DS19)",
+        "13-08-2026",
+        "15-08-2026",
+        "NROC-25CTABL23375",
+        "Catalina Andrea Duran Palma",
+        "$612060,00",
+        "MELON S.A.",
+        "76109779-2",
+        "Ingresado"
+      ],
+      [
         "2755",
         "Guía Electrónica",
         "(CRIO) PENCAHUE - BRISAS DE PENCAHUE 199 V. (DS49)",
@@ -1377,34 +1405,6 @@
         "$69365,00",
         "OPTIMIZA CONSULTING SPA",
         "77095052-k",
-        "Ingresado"
-      ],
-      [
-        "4289",
-        "Factura",
-        "(INMS) OFICINA CENTRAL",
-        "(INMS) OFICINA CENTRAL",
-        "14-08-2026",
-        "14-08-2026",
-        "NROC-OFIINMS193",
-        "Consuelo Uribe Gallego",
-        "$438511,00",
-        "OPTIMIZA CONSULTING SPA",
-        "77095052-k",
-        "Ingresado"
-      ],
-      [
-        "6835",
-        "Factura",
-        "(CISPA) OFICINA MARKETING",
-        "(CISPA) OFICINA MARKETING",
-        "14-08-2026",
-        "14-08-2026",
-        "NROC-OMKINDS1616",
-        "Daniela Eva Moreno Martinez",
-        "$450000,00",
-        "KOKE GRAF SPA",
-        "76892285-3",
         "Ingresado"
       ]
     ]
