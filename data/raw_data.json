@@ -3,6 +3,20 @@
     "name": "VSM ASOCIADOS SPA",
     "rows": [
       [
+        "202",
+        "Factura",
+        "(CRIO) CURICO - EDIFICIO DON SEBASTIÁN DE RAUQUEN 126 DEPTOS. (DS19)",
+        "(CRIO) CURICO - EDIFICIO DON SEBASTIÁN DE RAUQUEN 126 DEPTOS. (DS19)",
+        "29-08-2026",
+        "29-08-2026",
+        "NROC-25CCUSR11912",
+        "JOSE MARTIN MARDONES ROJAS",
+        "$180000,00",
+        "TRANSPORTES OYARZUN GONZALEZ SPA",
+        "77248836-K",
+        "Ingresado"
+      ],
+      [
         "3882169",
         "Guía Electrónica",
         "(CRIO) CURICO - EDIFICIO DON SEBASTIÁN DE RAUQUEN 126 DEPTOS. (DS19)",
@@ -682,20 +696,6 @@
         "28-08-2026",
         "28-08-2026",
         "NROC-25CTAVS21739",
-        "Noemi Yasmin Rios Diaz",
-        "$168300,00",
-        "COMERCIAL TABANCURA SPA",
-        "78026769-0",
-        "Ingresado"
-      ],
-      [
-        "2661",
-        "Guía Electrónica",
-        "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
-        "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
-        "28-08-2026",
-        "28-08-2026",
-        "NROC-25CTAVS21738",
         "Noemi Yasmin Rios Diaz",
         "$168300,00",
         "COMERCIAL TABANCURA SPA",
@@ -708,6 +708,20 @@
     "name": "Sociedad Guardias de Talca Ltda.",
     "rows": [
       [
+        "202",
+        "Factura",
+        "(CRIO) CURICO - EDIFICIO DON SEBASTIÁN DE RAUQUEN 126 DEPTOS. (DS19)",
+        "(CRIO) CURICO - EDIFICIO DON SEBASTIÁN DE RAUQUEN 126 DEPTOS. (DS19)",
+        "29-08-2026",
+        "29-08-2026",
+        "NROC-25CCUSR11912",
+        "JOSE MARTIN MARDONES ROJAS",
+        "$180000,00",
+        "TRANSPORTES OYARZUN GONZALEZ SPA",
+        "77248836-K",
+        "Ingresado"
+      ],
+      [
         "3882169",
         "Guía Electrónica",
         "(CRIO) CURICO - EDIFICIO DON SEBASTIÁN DE RAUQUEN 126 DEPTOS. (DS19)",
@@ -1387,20 +1401,6 @@
         "28-08-2026",
         "28-08-2026",
         "NROC-25CTAVS21739",
-        "Noemi Yasmin Rios Diaz",
-        "$168300,00",
-        "COMERCIAL TABANCURA SPA",
-        "78026769-0",
-        "Ingresado"
-      ],
-      [
-        "2661",
-        "Guía Electrónica",
-        "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
-        "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
-        "28-08-2026",
-        "28-08-2026",
-        "NROC-25CTAVS21738",
         "Noemi Yasmin Rios Diaz",
         "$168300,00",
         "COMERCIAL TABANCURA SPA",
