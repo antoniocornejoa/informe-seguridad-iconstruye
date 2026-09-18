@@ -3,6 +3,20 @@
     "name": "VSM ASOCIADOS SPA",
     "rows": [
       [
+        "76",
+        "Factura",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "18-09-2026",
+        "18-09-2026",
+        "NROC-25OTAOP13131",
+        "Rodolfo Segundo Reyes Fuenzalida",
+        "$361000,00",
+        "CARLOS ANDRES ROJAS RAMIREZ",
+        "13304960-6",
+        "Ingresado"
+      ],
+      [
         "8185",
         "Guía Electrónica",
         "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
@@ -684,20 +698,6 @@
         "NROC-25ITAHE11934",
         "Mario Antonio Bravo Toledo",
         "$2831554,32",
-        "ALUMINIOS DEL MAULE S.A.",
-        "96561920-8",
-        "Ingresado"
-      ],
-      [
-        "47638",
-        "Factura",
-        "(COLB) TALCA - EDIFICIO HACIENDA LA ESMERALDA IV 87 DEPTOS",
-        "(COLB) TALCA - EDIFICIO HACIENDA LA ESMERALDA IV 87 DEPTOS",
-        "25-08-2026",
-        "17-09-2026",
-        "NROC-25ITAHE11932",
-        "Mario Antonio Bravo Toledo",
-        "$10760987,26",
         "ALUMINIOS DEL MAULE S.A.",
         "96561920-8",
         "Ingresado"
@@ -708,6 +708,20 @@
     "name": "Sociedad Guardias de Talca Ltda.",
     "rows": [
       [
+        "76",
+        "Factura",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "18-09-2026",
+        "18-09-2026",
+        "NROC-25OTAOP13131",
+        "Rodolfo Segundo Reyes Fuenzalida",
+        "$361000,00",
+        "CARLOS ANDRES ROJAS RAMIREZ",
+        "13304960-6",
+        "Ingresado"
+      ],
+      [
         "8185",
         "Guía Electrónica",
         "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
@@ -1389,20 +1403,6 @@
         "NROC-25ITAHE11934",
         "Mario Antonio Bravo Toledo",
         "$2831554,32",
-        "ALUMINIOS DEL MAULE S.A.",
-        "96561920-8",
-        "Ingresado"
-      ],
-      [
-        "47638",
-        "Factura",
-        "(COLB) TALCA - EDIFICIO HACIENDA LA ESMERALDA IV 87 DEPTOS",
-        "(COLB) TALCA - EDIFICIO HACIENDA LA ESMERALDA IV 87 DEPTOS",
-        "25-08-2026",
-        "17-09-2026",
-        "NROC-25ITAHE11932",
-        "Mario Antonio Bravo Toledo",
-        "$10760987,26",
         "ALUMINIOS DEL MAULE S.A.",
         "96561920-8",
         "Ingresado"
