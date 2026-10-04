@@ -3,6 +3,20 @@
     "name": "VSM ASOCIADOS SPA",
     "rows": [
       [
+        "6222",
+        "Factura",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "04-10-2026",
+        "04-10-2026",
+        "NROC-25OTAOP13149",
+        "Juan Guillermo Jorquera Rojas",
+        "$490000,00",
+        "DECOAMBIENTE SPA",
+        "76561010-9",
+        "Ingresado"
+      ],
+      [
         "3653",
         "Guía Electrónica",
         "(CRIO) PENCAHUE - BRISAS DE PENCAHUE 199 V. (DS49)",
@@ -686,20 +700,6 @@
         "$524464,05",
         "CEMENTOS BIO BIO S.A.",
         "91755000-K",
-        "Ingresado"
-      ],
-      [
-        "11182",
-        "Guía Electrónica",
-        "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
-        "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
-        "02-10-2026",
-        "02-10-2026",
-        "NROC-25CTAVS22033",
-        "Maykel Adrian Manzor Zambrano",
-        "$293332,36",
-        "Hormigones Hormimax Limitada",
-        "78297967-1",
         "Ingresado"
       ]
     ]
@@ -708,6 +708,20 @@
     "name": "Sociedad Guardias de Talca Ltda.",
     "rows": [
       [
+        "6222",
+        "Factura",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "(COLB) TALCA - PARQUE ESMERALDA URBANIZACION SEPULVEDA",
+        "04-10-2026",
+        "04-10-2026",
+        "NROC-25OTAOP13149",
+        "Juan Guillermo Jorquera Rojas",
+        "$490000,00",
+        "DECOAMBIENTE SPA",
+        "76561010-9",
+        "Ingresado"
+      ],
+      [
         "3653",
         "Guía Electrónica",
         "(CRIO) PENCAHUE - BRISAS DE PENCAHUE 199 V. (DS49)",
@@ -1391,20 +1405,6 @@
         "$524464,05",
         "CEMENTOS BIO BIO S.A.",
         "91755000-K",
-        "Ingresado"
-      ],
-      [
-        "11182",
-        "Guía Electrónica",
-        "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
-        "(CRIO) TALCA EDIFICIO VALLES SAN VALENTÍN II 139 DEPTOS 14 LC. (DS19)",
-        "02-10-2026",
-        "02-10-2026",
-        "NROC-25CTAVS22033",
-        "Maykel Adrian Manzor Zambrano",
-        "$293332,36",
-        "Hormigones Hormimax Limitada",
-        "78297967-1",
         "Ingresado"
       ]
     ]
